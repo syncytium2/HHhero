@@ -30,7 +30,7 @@ export interface Rate {
   kind: RateKind;
   /** scale, 1/ms (the linoid's A is per mV: A·x is a rate) */
   A: number;
-  /** voltage the form is centred on, mV */
+  /** voltage the form is centered on, mV */
   v0: number;
   /** voltage scale, mV (positive) */
   k: number;

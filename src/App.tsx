@@ -10,6 +10,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Plot, type Series } from "./ui/Plot.tsx";
 import { Slider } from "./ui/Slider.tsx";
+import { clampView, isFull, type Range } from "./ui/zoom.ts";
 import {
   fmt, GATE_IDS, infEdited, NO_EDIT, rateEdited, rateFormula, STOCK_RATES, stockGate, tauEdited,
   type GateId, type GateParams, type Rate,
@@ -29,7 +30,6 @@ const C = {
   m: "var(--m)", h: "var(--h)", n: "var(--n)", na: "var(--na)", k: "var(--k)",
   ink: "var(--ink)", stock: "var(--stock)",
 };
-const SUB: Record<GateId, string> = { m: "m", h: "h", n: "n" };
 
 function useWide() {
   const q = "(min-width: 900px)";
@@ -53,6 +53,8 @@ function curves(md: Model, id: GateId) {
   };
 }
 
+const STOCK_CURVES = { m: curves(STOCK_MODEL, "m"), h: curves(STOCK_MODEL, "h"), n: curves(STOCK_MODEL, "n") };
+
 const SETTLE_MS = 50, DT = 0.01;
 function spike(md: Model, stim: Stimulus) {
   const st = settle(md, stim.hold, SETTLE_MS, DT);
@@ -63,7 +65,9 @@ export function App() {
   const [p, setP] = useState<Params>(stockParams);
   const [view, setView] = useState<View>("ab");
   const [sel, setSel] = useState<Sel>("m");
-  const [gate, setGate] = useState<GateId>("m");
+  // the gates drawn on the curve plots: any combination, toggled on and off
+  const [shown, setShown] = useState<GateId[]>(["m"]);
+  const [logY, setLogY] = useState(false);
   const [tab, setTab] = useState<SimTab>("clamp");
   const [clampTrace, setClampTrace] = useState<"iNa" | "iK" | "iv">("iNa");
   const [spikeTrace, setSpikeTrace] = useState<"i" | "g" | "gates">("i");
@@ -71,21 +75,28 @@ export function App() {
   const [stim, setStim] = useState<Stimulus>(DEFAULT_STIM);
   const [cursor, setCursor] = useState(-40);
   const [about, setAbout] = useState(false);
+  const [clampX, setClampX] = useState<Range | null>(null);
+  const [spikeX, setSpikeX] = useState<Range | null>(null);
   const wide = useWide();
   // a new view or chip starts at the top of the panel, where the notes are
   const panelRef = useRef<HTMLDivElement>(null);
   useEffect(() => { if (panelRef.current) panelRef.current.scrollTop = 0; }, [view, sel]);
 
   const md = useMemo(() => buildModel(p), [p]);
-  const cv = useMemo(() => curves(md, gate), [md, gate]);
-  const cs = useMemo(() => curves(STOCK_MODEL, gate), [gate]);
+  const cv = useMemo(() => ({ m: curves(md, "m"), h: curves(md, "h"), n: curves(md, "n") }), [md]);
   const fam = useMemo(() => clampFamily(md, clamp), [md, clamp]);
   const famStock = useMemo(() => clampFamily(STOCK_MODEL, clamp), [clamp]);
   const sweepMs = Math.max(40, stim.start + stim.dur + 25);
   const ap = useMemo(() => spike(md, { ...stim, sweep: sweepMs }), [md, stim, sweepMs]);
   const apStock = useMemo(() => spike(STOCK_MODEL, { ...stim, sweep: sweepMs }), [stim, sweepMs]);
 
-  const pick = (s: Sel) => { setSel(s); if (s === "m" || s === "h" || s === "n") setGate(s); };
+  // choosing a gate to edit also draws it; the curve card's buttons toggle what is drawn
+  const pick = (s: Sel) => {
+    setSel(s);
+    if (s === "m" || s === "h" || s === "n") setShown((q) => (q.includes(s) ? q : GATE_IDS.filter((id) => id === s || q.includes(id))));
+  };
+  const toggleShown = (id: GateId) =>
+    setShown((q) => (q.includes(id) ? (q.length > 1 ? q.filter((x) => x !== id) : q) : GATE_IDS.filter((x) => x === id || q.includes(x))));
   const setGateP = (id: GateId, f: (g: GateParams) => GateParams) => setP((q) => ({ ...q, gates: { ...q.gates, [id]: f(q.gates[id]) } }));
   const setRate = (id: GateId, which: "alpha" | "beta", key: keyof Omit<Rate, "kind">, v: number) =>
     setGateP(id, (g) => ({ ...g, [which]: { ...g[which], [key]: v } }));
@@ -100,66 +111,77 @@ export function App() {
   };
   const anyEdited = (["m", "h", "n", "na", "k", "mem", "proto"] as Sel[]).some(edited);
 
-  const g = md.g[gate];
-  const gp = p.gates[gate];
   const H = wide
-    ? { curve: 260, sim: 300, sim2: 200 }
-    : { curve: 136, sim: 150, sim2: 80 };
+    ? { curve: 260, strip: 72, sim: 280, v: 170, sim2: 180 }
+    : { curve: 132, strip: 46, sim: 124, v: 64, sim2: 80 };
 
   // ------------------------------------------------------------ curves
+  const one = shown.length === 1;
+  const gs = (id: GateId) => (one ? "" : id); // a label needs the gate's name only when several are drawn
+  const stockS = (k: "a" | "b" | "inf" | "tau", dash?: string): Series[] =>
+    shown.map((id) => ({ x: VGRID, y: STOCK_CURVES[id][k], color: C.stock, width: 3, dash }));
+  const names = shown.join(", ");
   const curvePlots =
     view === "ab" ? (
       <Plot
         height={H.curve}
-        ariaLabel={`alpha and beta of ${gate}`}
+        ariaLabel={`alpha and beta of ${names}`}
         x={[-100, 50]}
-        yInclude={[0]}
+        yInclude={logY ? undefined : [0]}
+        yLog={logY}
         xLabel="mV"
-        yLabel={`α${SUB[gate]}, β${SUB[gate]} (1/ms)`}
+        yLabel={`α, β (1/ms)${logY ? ", log" : ""} · solid α, dashed β`}
         cursor={cursor}
         onCursor={setCursor}
         series={[
-          { x: VGRID, y: cs.a, color: C.stock, width: 3 },
-          { x: VGRID, y: cs.b, color: C.stock, width: 3, dash: "5 4" },
-          { x: VGRID, y: cv.a, color: C[gate], label: "α" },
-          { x: VGRID, y: cv.b, color: C[gate], dash: "5 4", label: "β" },
+          ...stockS("a"),
+          ...stockS("b", "5 4"),
+          ...shown.map((id) => ({ x: VGRID, y: cv[id].a, color: C[id], label: `α${gs(id)}` }) as Series),
+          ...shown.map((id) => ({ x: VGRID, y: cv[id].b, color: C[id], dash: "5 4", label: `β${gs(id)}` }) as Series),
         ]}
       />
     ) : (
       <div className="pair">
         <Plot
           height={H.curve}
-          ariaLabel={`steady state of ${gate}`}
+          ariaLabel={`steady state of ${names}`}
           x={[-100, 50]}
           y={[-0.04, 1.04]}
           xLabel="mV"
-          yLabel={`${SUB[gate]}∞`}
+          yLabel="x∞"
           cursor={cursor}
           onCursor={setCursor}
-          series={[
-            { x: VGRID, y: cs.inf, color: C.stock, width: 3 },
-            { x: VGRID, y: cv.inf, color: C[gate], label: `${SUB[gate]}∞` },
-          ]}
+          series={[...stockS("inf"), ...shown.map((id) => ({ x: VGRID, y: cv[id].inf, color: C[id], label: `${id}∞` }) as Series)]}
         />
         <Plot
           height={H.curve}
-          ariaLabel={`time constant of ${gate}`}
+          ariaLabel={`time constant of ${names}`}
           x={[-100, 50]}
-          yInclude={[0]}
+          yInclude={logY ? undefined : [0]}
+          yLog={logY}
           xLabel="mV"
-          yLabel={`τ${SUB[gate]} (ms)`}
+          yLabel={`τ (ms)${logY ? ", log" : ""}`}
           cursor={cursor}
           onCursor={setCursor}
-          series={[
-            { x: VGRID, y: cs.tau, color: C.stock, width: 3 },
-            { x: VGRID, y: cv.tau, color: C[gate], label: "τ" },
-          ]}
+          series={[...stockS("tau"), ...shown.map((id) => ({ x: VGRID, y: cv[id].tau, color: C[id], label: `τ${gs(id)}` }) as Series)]}
         />
       </div>
     );
   const readout = (
     <p className="readout" aria-live="polite">
-      <b>{fmt(cursor)} mV</b> · α {fmt(g.alpha(cursor))} · β {fmt(g.beta(cursor))} /ms · {SUB[gate]}∞ {fmt(g.inf(cursor))} · τ {fmt(g.tau(cursor))} ms
+      <b>{fmt(cursor)} mV</b>
+      {shown.map((id) => {
+        const g = md.g[id];
+        return (
+          <span key={id} style={{ color: C[id] }}>
+            {" · "}
+            {view === "ab"
+              ? `α${id} ${fmt(g.alpha(cursor))}, β${id} ${fmt(g.beta(cursor))}`
+              : `${id}∞ ${fmt(g.inf(cursor))}, τ${id} ${fmt(g.tau(cursor))}`}
+          </span>
+        );
+      })}
+      <span className="muted">{view === "ab" ? " /ms" : " ms"}</span>
     </p>
   );
 
@@ -167,6 +189,54 @@ export function App() {
   const mA = (a: Float64Array) => a.map((x) => x / 1000);
   const n = fam.length;
   const shade = (k: number) => 0.35 + (0.65 * k) / Math.max(1, n - 1);
+  // one horizontal zoom per experiment, shared by every plot on its time axis
+  const clampFull: Range = [0, clamp.pre + clamp.dur];
+  const spikeFull: Range = [0, sweepMs];
+  // the reset lives in the caption, not over a plot
+  const clampZoom = { view: clampView(clampX ?? clampFull, clampFull, 0.5), onView: setClampX, minSpan: 0.5, button: false };
+  const spikeZoom = { view: clampView(spikeX ?? spikeFull, spikeFull, 1), onView: setSpikeX, minSpan: 1, button: false };
+  const zoomOn = tab === "clamp" ? clampTrace !== "iv" && !isFull(clampZoom.view, clampFull) : !isFull(spikeZoom.view, spikeFull);
+
+  // the protocol strip: what the experimenter commands, on the traces' time axis
+  const steps = fam.map((s) => s.v);
+  const protocol =
+    tab === "clamp" ? (
+      <Plot
+        height={H.strip}
+        ariaLabel="voltage-clamp protocol"
+        x={clampFull}
+        zoom={clampZoom}
+        noXTicks
+        yInclude={[clamp.hold, clamp.from, clamp.to]}
+        yLabel={`command V (mV): hold ${fmt(clamp.hold)}, steps ${fmt(clamp.from)} to ${fmt(clamp.to)} by ${fmt(clamp.by)}`}
+        series={steps.map((v, k) => ({
+          x: [0, clamp.pre, clamp.pre, clamp.pre + clamp.dur],
+          y: [clamp.hold, clamp.hold, v, v],
+          color: C.ink,
+          width: 1.2,
+          opacity: shade(k),
+        }))}
+      />
+    ) : (
+      <Plot
+        height={H.strip}
+        ariaLabel="current pulse protocol"
+        x={spikeFull}
+        zoom={spikeZoom}
+        noXTicks
+        yInclude={[0, stim.hold, stim.hold + stim.amp]}
+        yLabel={`injected I (µA/cm²): ${fmt(stim.amp)} for ${fmt(stim.dur)} ms at ${fmt(stim.start)} ms`}
+        series={[
+          {
+            x: [0, stim.start, stim.start, stim.start + stim.dur, stim.start + stim.dur, sweepMs],
+            y: [stim.hold, stim.hold, stim.hold + stim.amp, stim.hold + stim.amp, stim.hold, stim.hold],
+            color: C.ink,
+            width: 1.4,
+          },
+        ]}
+      />
+    );
+
   let simPlot;
   if (tab === "clamp") {
     if (clampTrace === "iv") {
@@ -195,11 +265,12 @@ export function App() {
         <Plot
           height={H.sim}
           ariaLabel={key === "iNa" ? "sodium current family" : "potassium current family"}
-          x={[0, clamp.pre + clamp.dur]}
+          x={clampFull}
+          zoom={clampZoom}
           zeroLine
           yInclude={[0]}
           xLabel="ms"
-          yLabel={`${key === "iNa" ? "INa" : "IK"} (mA/cm²), steps ${fmt(clamp.from)} to ${fmt(clamp.to)} mV`}
+          yLabel={`${key === "iNa" ? "INa" : "IK"} (mA/cm²)`}
           series={[
             ...famStock.map((s) => ({ x: s.t, y: mA(s[key]), color: C.stock, width: 2.5 }) as Series),
             ...fam.map((s, k) => ({ x: s.t, y: mA(s[key]), color: col, width: 1.4, opacity: shade(k) }) as Series),
@@ -227,9 +298,11 @@ export function App() {
     simPlot = (
       <>
         <Plot
-          height={H.sim - H.sim2 + 30}
+          height={H.v}
           ariaLabel="membrane potential"
-          x={[0, sweepMs]}
+          x={spikeFull}
+          zoom={spikeZoom}
+          noXTicks
           yInclude={[-80, 40]}
           yLabel="V (mV)"
           series={[
@@ -240,7 +313,8 @@ export function App() {
         <Plot
           height={H.sim2}
           ariaLabel={spikeTrace === "gates" ? "gates during the action potential" : "currents during the action potential"}
-          x={[0, sweepMs]}
+          x={spikeFull}
+          zoom={spikeZoom}
           zeroLine
           y={spikeTrace === "gates" ? [-0.04, 1.04] : undefined}
           yInclude={[0]}
@@ -256,6 +330,7 @@ export function App() {
   let controls;
   if (sel === "m" || sel === "h" || sel === "n") {
     const id = sel;
+    const gp = p.gates[id];
     const s = STOCK_RATES[id];
     const other =
       view === "ab"
@@ -279,7 +354,7 @@ export function App() {
         <fieldset className="group">
           <legend className="formula">{rateFormula(nm, r)}</legend>
           <Slider label={`${nm} scale A`} unit={r.kind === "linoid" ? "/mV/ms" : "/ms"} value={r.A} min={r0.A / 10} max={r0.A * 10} log stock={r0.A} onChange={(v) => setRate(id, which, "A", v)} />
-          <Slider label={`${nm} centre V0`} unit="mV" value={r.v0} min={r0.v0 - 50} max={r0.v0 + 50} step={0.5} stock={r0.v0} onChange={(v) => setRate(id, which, "v0", v)} />
+          <Slider label={`${nm} center V0`} unit="mV" value={r.v0} min={r0.v0 - 50} max={r0.v0 + 50} step={0.5} stock={r0.v0} onChange={(v) => setRate(id, which, "v0", v)} />
           <Slider label={`${nm} voltage scale k`} unit="mV" value={r.k} min={Math.max(1, r0.k / 4)} max={r0.k * 4} log stock={r0.k} onChange={(v) => setRate(id, which, "k", v)} />
         </fieldset>
       );
@@ -387,10 +462,20 @@ export function App() {
           <div className="card-head">
             <span className="gate-pick">
               {GATE_IDS.map((id) => (
-                <button key={id} className={gate === id ? "on" : ""} style={{ color: C[id] }} onClick={() => pick(id)}>{id}</button>
+                <button
+                  key={id}
+                  aria-pressed={shown.includes(id)}
+                  aria-label={`show ${id}`}
+                  className={shown.includes(id) ? "on" : ""}
+                  style={shown.includes(id) ? { background: C[id], borderColor: C[id] } : { color: C[id] }}
+                  onClick={() => toggleShown(id)}
+                >
+                  {id}
+                </button>
               ))}
             </span>
-            <span className="muted">{fmt(p.celsius)} °C · grey = stock</span>
+            <button className={`log-btn${logY ? " on" : ""}`} aria-pressed={logY} aria-label="log scale" onClick={() => setLogY(!logY)}>log</button>
+            <span className="muted">{fmt(p.celsius)} °C · gray = stock</span>
           </div>
           {curvePlots}
           {readout}
@@ -412,8 +497,15 @@ export function App() {
                   ))}
             </span>
           </div>
+          {(tab === "spike" || clampTrace !== "iv") && protocol}
           {simPlot}
-          <p className="caption">{tab === "clamp" ? "Ideal clamp, no electrode or leak: what no rig records." : "The membrane alone, no electrode: a model, not a recording."}</p>
+          <p className="caption">
+            {tab === "clamp" ? "Ideal clamp, no electrode: what no rig records." : "The membrane alone, no electrode."}
+            {(tab === "spike" || clampTrace !== "iv") && !zoomOn && " Pinch to zoom time, drag to pan, double-tap to reset."}
+            {zoomOn && (
+              <button className="zoom-reset" onClick={() => (tab === "clamp" ? setClampX(null) : setSpikeX(null))}>Reset zoom</button>
+            )}
+          </p>
         </section>
       </main>
 

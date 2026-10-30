@@ -63,7 +63,7 @@ together at 360×740; the controls panel scrolls on its own. Every button and
 slider is at least 44 px (the gate picker and trace tabs 36). Plots are
 hand-drawn SVG: a few hundred points each, and owning the drawing makes a
 press-and-drag voltage cursor simple (phones have no hover). The stock model
-stays in grey under every edited curve.
+stays in gray under every edited curve.
 
 **Under review, not indexed**: robots.txt disallows all, `X-Robots-Tag:
 noindex`, and no sitemap, until the owner approves. Not linked from
@@ -81,3 +81,29 @@ university's DNS still cached the name as nonexistent (it had been looked up
 before the record existed); fetched through Cloudflare's edge directly, it
 served the deployed bundle. The deploy script now refuses to start without
 node and npm, and says to use Git Bash.
+
+## 2026-10-30: m, h and n together; a protocol strip; zoom; American spelling
+
+The owner, after trying v0.1.1: "add the ability to show m, h, and n on the
+same display (clicking toggles on off, not switch between)"; "need an easy
+horizontal zoom that works on a phone for second row"; "need a row showing
+the protocol in the second row"; and "kill the british spellings everywhere".
+
+- **Gates drawn together.** The m, h, n buttons on the curve card toggle which
+  gates are drawn (at least one stays on). The m, h, n chips under the plots
+  still choose which gate the sliders edit, and choosing one also draws it.
+  With all three on, βm (up to about 28/ms) flattens h and n on a linear axis,
+  so the rate and τ plots have a **log** switch (off by default; the floor is
+  1e-4). End labels are spread apart so none overlaps (`src/ui/labels.ts`,
+  tested). The readout lists every drawn gate at the cursor.
+- **Protocol strip.** Above the traces, a thin plot of what the experimenter
+  commands: the clamp's voltage steps, or the injected current pulse, on the
+  traces' time axis. Not shown with the I–V plot, whose axis is voltage.
+- **Zoom.** Pinch the time axis, drag to pan once zoomed, double-tap or the
+  caption's Reset zoom to return. The strip and every trace on one
+  experiment share one view. The arithmetic is pure and tested
+  (`src/ui/zoom.ts`); the screenshot check pinches with synthetic touch
+  pointers and checks the axis narrowed, the plots below followed, and the
+  reset restored it.
+- **American spelling everywhere**: "centre" and "grey" were in the UI and
+  comments; now "center" and "gray".

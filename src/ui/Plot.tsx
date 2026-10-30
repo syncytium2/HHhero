@@ -6,6 +6,8 @@
  * does not scroll under the finger.
  */
 import { useEffect, useRef, useState, type PointerEvent } from "react";
+import { spreadLabels } from "./labels.ts";
+import { isFull, pinchView, type Range } from "./zoom.ts";
 
 export interface Series {
   x: ArrayLike<number>;
@@ -31,10 +33,20 @@ interface Props {
   cursor?: number;
   onCursor?: (x: number) => void;
   zeroLine?: boolean;
+  /** log10 y axis; values at or below 1e-4 are drawn at the floor */
+  yLog?: boolean;
+  /**
+   * Horizontal zoom: `x` is the full range and `view` the part shown. Pinch to
+   * zoom, drag to pan when zoomed, double-tap to reset. Plots that share a time
+   * axis share one view.
+   */
+  zoom?: { view: Range; onView: (v: Range) => void; minSpan: number; /** show the reset button here (one plot per axis) */ button?: boolean };
+  /** leave out the x tick labels (a plot stacked above another with the same axis) */
+  noXTicks?: boolean;
   ariaLabel: string;
 }
 
-const M = { l: 42, r: 10, t: 16, b: 26 };
+const MARGIN = { l: 42, r: 10, t: 16, b: 26 };
 
 function useWidth() {
   const ref = useRef<HTMLDivElement>(null);
@@ -97,15 +109,24 @@ function yAt(s: Series, xv: number): number {
   return s.y[lo] + f * (s.y[hi] - s.y[lo]);
 }
 
-export function Plot({ height, series, x, y, yInclude, xLabel, yLabel, cursor, onCursor, zeroLine, ariaLabel }: Props) {
+export function Plot({ height, series: raw, x: full, y, yInclude, xLabel, yLabel, cursor, onCursor, zeroLine, yLog, zoom, noXTicks, ariaLabel }: Props) {
   const [ref, width] = useWidth();
-  const yr = y ?? autoRange(series, x, yInclude);
+  const x: Range = zoom ? zoom.view : full;
+  // on a log axis everything below works in log10 units; only the tick labels go back
+  const LOG_FLOOR = -4;
+  const lg = (v: number) => (v > 0 ? Math.max(LOG_FLOOR, Math.log10(v)) : LOG_FLOOR);
+  const series = yLog ? raw.map((s) => ({ ...s, y: Array.from(s.y, lg) })) : raw;
+  const yr = y ? (yLog ? ([lg(y[0]), lg(y[1])] as [number, number]) : y) : autoRange(series, x, yLog ? yInclude?.map(lg) : yInclude);
+  const M = noXTicks ? { ...MARGIN, b: 6 } : MARGIN;
   const pw = width - M.l - M.r, ph = height - M.t - M.b;
   const sx = (v: number) => M.l + ((v - x[0]) / (x[1] - x[0])) * pw;
   const sy = (v: number) => M.t + (1 - (v - yr[0]) / (yr[1] - yr[0])) * ph;
   const clampY = (v: number) => Math.max(M.t - 4, Math.min(M.t + ph + 4, v));
   const xt = niceTicks(x[0], x[1], Math.max(2, Math.floor(pw / 60)));
-  const yt = niceTicks(yr[0], yr[1], Math.max(2, Math.floor(ph / 32)));
+  const yt = yLog
+    ? Array.from({ length: Math.floor(yr[1]) - Math.ceil(yr[0]) + 1 }, (_, i) => Math.ceil(yr[0]) + i)
+    : niceTicks(yr[0], yr[1], Math.max(2, Math.floor(ph / 32)));
+  const yTickText = (v: number) => (yLog ? tickText(Math.pow(10, v)) : tickText(v));
 
   const toX = (e: PointerEvent<SVGSVGElement>) => {
     const r = e.currentTarget.getBoundingClientRect();
@@ -114,18 +135,66 @@ export function Plot({ height, series, x, y, yInclude, xLabel, yLabel, cursor, o
   };
   const down = useRef(false);
 
+  // ---- zoom gestures: pointers by id; two make a pinch, one pans; a quick second tap resets
+  const pts = useRef(new Map<number, number>());
+  const gesture = useRef<{ view0: Range; f0: number; d0: number } | null>(null);
+  const lastTap = useRef(0);
+  const frac = (clientX: number, svg: SVGSVGElement) => (clientX - svg.getBoundingClientRect().left - M.l) / pw;
+  const startGesture = (svg: SVGSVGElement) => {
+    const xs = [...pts.current.values()];
+    const mid = xs.reduce((a, b) => a + b, 0) / xs.length;
+    gesture.current = { view0: zoom!.view, f0: frac(mid, svg), d0: xs.length > 1 ? Math.abs(xs[0] - xs[1]) || 1 : 1 };
+  };
+  const zoomHandlers = zoom && {
+    onPointerDown: (e: PointerEvent<SVGSVGElement>) => {
+      const now = e.timeStamp;
+      if (pts.current.size === 0 && now - lastTap.current < 300) {
+        zoom.onView(full);
+        lastTap.current = 0;
+        return;
+      }
+      if (pts.current.size === 0) lastTap.current = now;
+      try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* synthetic pointers in tests */ }
+      pts.current.set(e.pointerId, e.clientX);
+      startGesture(e.currentTarget);
+    },
+    onPointerMove: (e: PointerEvent<SVGSVGElement>) => {
+      if (!pts.current.has(e.pointerId) || !gesture.current) return;
+      pts.current.set(e.pointerId, e.clientX);
+      const xs = [...pts.current.values()];
+      const mid = xs.reduce((a, b) => a + b, 0) / xs.length;
+      const g = gesture.current;
+      const ratio = xs.length > 1 ? (Math.abs(xs[0] - xs[1]) || 1) / g.d0 : 1;
+      if (xs.length === 1 && isFull(g.view0, full)) return; // nothing to pan
+      if (Math.abs(mid - (g.f0 * pw + e.currentTarget.getBoundingClientRect().left + M.l)) > 6 || ratio !== 1) lastTap.current = 0;
+      zoom.onView(pinchView(g.view0, full, g.f0, frac(mid, e.currentTarget), ratio, zoom.minSpan));
+    },
+    onPointerUp: (e: PointerEvent<SVGSVGElement>) => {
+      pts.current.delete(e.pointerId);
+      if (pts.current.size) startGesture(e.currentTarget);
+      else gesture.current = null;
+    },
+    onPointerCancel: (e: PointerEvent<SVGSVGElement>) => {
+      pts.current.delete(e.pointerId);
+      gesture.current = null;
+    },
+  };
+
   return (
     <div ref={ref} className="plot">
+      {zoom && zoom.button !== false && !isFull(zoom.view, full) && (
+        <button className="zoom-reset" onClick={() => zoom.onView(full)}>Reset zoom</button>
+      )}
       <svg
         width={width}
         height={height}
         role="img"
         aria-label={ariaLabel}
-        style={{ touchAction: onCursor ? "none" : "pan-y" }}
-        onPointerDown={onCursor ? (e) => { down.current = true; e.currentTarget.setPointerCapture(e.pointerId); onCursor(toX(e)); } : undefined}
-        onPointerMove={onCursor ? (e) => { if (down.current) onCursor(toX(e)); } : undefined}
-        onPointerUp={onCursor ? () => (down.current = false) : undefined}
-        onPointerCancel={onCursor ? () => (down.current = false) : undefined}
+        style={{ touchAction: onCursor || zoom ? "none" : "pan-y" }}
+        onPointerDown={zoomHandlers ? zoomHandlers.onPointerDown : onCursor ? (e) => { down.current = true; e.currentTarget.setPointerCapture(e.pointerId); onCursor(toX(e)); } : undefined}
+        onPointerMove={zoomHandlers ? zoomHandlers.onPointerMove : onCursor ? (e) => { if (down.current) onCursor(toX(e)); } : undefined}
+        onPointerUp={zoomHandlers ? zoomHandlers.onPointerUp : onCursor ? () => (down.current = false) : undefined}
+        onPointerCancel={zoomHandlers ? zoomHandlers.onPointerCancel : onCursor ? () => (down.current = false) : undefined}
       >
         <defs>
           <clipPath id={`clip-${ariaLabel.replace(/\W/g, "")}`}>
@@ -134,17 +203,17 @@ export function Plot({ height, series, x, y, yInclude, xLabel, yLabel, cursor, o
         </defs>
         {yt.map((v) => (
           <g key={`y${v}`}>
-            <line x1={M.l} x2={M.l + pw} y1={sy(v)} y2={sy(v)} className={v === 0 && zeroLine ? "zero" : "grid"} />
-            <text x={M.l - 5} y={sy(v) + 3.5} className="tick" textAnchor="end">{tickText(v)}</text>
+            <line x1={M.l} x2={M.l + pw} y1={sy(v)} y2={sy(v)} className={v === 0 && zeroLine && !yLog ? "zero" : "grid"} />
+            <text x={M.l - 5} y={sy(v) + 3.5} className="tick" textAnchor="end">{yTickText(v)}</text>
           </g>
         ))}
         {xt.map((v) => (
           <g key={`x${v}`}>
             <line x1={sx(v)} x2={sx(v)} y1={M.t} y2={M.t + ph} className="grid" />
-            <text x={sx(v)} y={M.t + ph + 13} className="tick" textAnchor="middle">{tickText(v)}</text>
+            {!noXTicks && <text x={sx(v)} y={M.t + ph + 13} className="tick" textAnchor="middle">{tickText(v)}</text>}
           </g>
         ))}
-        {xLabel && <text x={M.l + pw} y={height - 2} className="axis-label" textAnchor="end">{xLabel}</text>}
+        {xLabel && !noXTicks && <text x={M.l + pw} y={height - 2} className="axis-label" textAnchor="end">{xLabel}</text>}
         {yLabel && <text x={4} y={10} className="axis-label">{yLabel}</text>}
         <g clipPath={`url(#clip-${ariaLabel.replace(/\W/g, "")})`}>
           {series.map((s, k) => {
@@ -161,21 +230,32 @@ export function Plot({ height, series, x, y, yInclude, xLabel, yLabel, cursor, o
             );
           })}
         </g>
-        {series.map((s, k) => {
-          if (!s.label) return null;
-          // the label sits at the line's last visible point, or beside its peak
-          let i = s.x.length - 1;
-          while (i > 0 && (s.x[i] > x[1] || !Number.isFinite(s.y[i]))) i--;
-          if (s.labelAt === "peak") {
-            let best = 0;
-            for (let j = 0; j < s.x.length; j++) if (s.x[j] <= x[1] && Math.abs(s.y[j]) > Math.abs(s.y[best])) best = j;
-            const below = s.y[best] < 0;
-            const ly = Math.max(M.t + 8, Math.min(M.t + ph - 3, sy(s.y[best]) + (below ? 13 : -5)));
-            return <text key={`l${k}`} x={Math.min(sx(s.x[best]) + 6, M.l + pw - 2)} y={ly} className="series-label" textAnchor="start" style={{ fill: s.color }}>{s.label}</text>;
-          }
-          const ly = Math.max(M.t + 8, Math.min(M.t + ph - 3, sy(s.y[i]) - 4));
-          return <text key={`l${k}`} x={Math.min(sx(s.x[i]), M.l + pw) - 2} y={ly} className="series-label" textAnchor="end" style={{ fill: s.color }}>{s.label}</text>;
-        })}
+        {(() => {
+          // end labels sit at each line's last visible point, spread apart so none overlaps;
+          // peak labels sit beside the line's largest excursion from zero
+          const ends: { k: number; x: number; y: number }[] = [];
+          const out: JSX.Element[] = [];
+          series.forEach((s, k) => {
+            if (!s.label) return;
+            if (s.labelAt === "peak") {
+              let best = 0;
+              for (let j = 0; j < s.x.length; j++) if (s.x[j] <= x[1] && Math.abs(s.y[j]) > Math.abs(s.y[best])) best = j;
+              const below = s.y[best] < 0;
+              const ly = Math.max(M.t + 8, Math.min(M.t + ph - 3, sy(s.y[best]) + (below ? 13 : -5)));
+              out.push(<text key={`l${k}`} x={Math.min(sx(s.x[best]) + 6, M.l + pw - 2)} y={ly} className="series-label" textAnchor="start" style={{ fill: s.color }}>{s.label}</text>);
+              return;
+            }
+            let i = s.x.length - 1;
+            while (i > 0 && (s.x[i] > x[1] || !Number.isFinite(s.y[i]))) i--;
+            ends.push({ k, x: Math.min(sx(s.x[i]), M.l + pw) - 2, y: sy(s.y[i]) - 4 });
+          });
+          const ys = spreadLabels(ends.map((e) => e.y), 12, M.t + 8, M.t + ph - 3);
+          ends.forEach((e, j) => {
+            const s = series[e.k];
+            out.push(<text key={`l${e.k}`} x={e.x} y={ys[j]} className="series-label" textAnchor="end" style={{ fill: s.color }}>{s.label}</text>);
+          });
+          return out;
+        })()}
         {cursor !== undefined && cursor >= x[0] && cursor <= x[1] && (
           <g>
             <line x1={sx(cursor)} x2={sx(cursor)} y1={M.t} y2={M.t + ph} className="cursor" />

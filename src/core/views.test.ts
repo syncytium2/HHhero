@@ -11,7 +11,7 @@ import { noteFor } from "./notes.ts";
 const REF = { m: hhM, h: hhH, n: hhN };
 const VS: number[] = [];
 for (let v = -150; v <= 100; v += 0.37) VS.push(v);
-VS.push(-40, -55, -65, -35, -25); // the removable singularities and the centres
+VS.push(-40, -55, -65, -35, -25); // the removable singularities and the centers
 
 describe("at no edit, both views are gaba_excites' (NEURON-checked) HH gates to the bit", () => {
   for (const celsius of [0, 6.3, 18.5, 30])
