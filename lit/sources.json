@@ -1,0 +1,51 @@
+{
+  "note": "Every number, equation or method taken from a source. Copied from gaba_excites at 25d74e3 and cut to what HHhero uses.",
+  "sources": [
+    {
+      "key": "hodgkin1952",
+      "type": "article",
+      "authors": [
+        "Hodgkin AL",
+        "Huxley AF"
+      ],
+      "year": 1952,
+      "title": "A quantitative description of membrane current and its application to conduction and excitation in nerve",
+      "journal": "J Physiol",
+      "volume": "117",
+      "issue": "4",
+      "pages": "500–544",
+      "doi": "10.1113/jphysiol.1952.sp004764",
+      "pmid": "12991237",
+      "pmcid": "PMC1392413",
+      "access": "open",
+      "role": "model",
+      "took": "The squid giant axon: INa = gNa m³h (V − ENa), IK = gK n⁴ (V − EK), the rate functions (Eqs. 12, 13, 20, 21, 23, 24, p. 519) and the three forms they take, the constants of Table 3 (p. 520), and the Q10 of 3 from 6.3 °C. All checked against the port in src/core/hh.test.ts.",
+      "usedIn": [
+        "src/core/rates.ts",
+        "src/core/model.ts",
+        "src/core/hh.test.ts",
+        "src/App.tsx"
+      ],
+      "notes": "notes/hodgkin1952.md"
+    },
+    {
+      "key": "neuronhh",
+      "type": "code",
+      "authors": [
+        "Hines ML",
+        "Carnevale NT"
+      ],
+      "year": 2025,
+      "title": "hh.mod: the Hodgkin–Huxley mechanism built into the NEURON simulator",
+      "url": "https://github.com/neuronsimulator/nrn/blob/master/src/nrnoc/hh.mod",
+      "access": "open (code)",
+      "role": "model",
+      "took": "The 1952 rate functions as NEURON writes them (vtrap at the removable singularities) and the temperature factor 3^((T − 6.3)/10); and the mechanism itself, run in NEURON 9.0.2 as the oracle the port is tested against (tools/neuron_oracle_hh.py).",
+      "usedIn": [
+        "src/core/reference.ts",
+        "tools/neuron_oracle_hh.py",
+        "src/core/hh.test.ts"
+      ]
+    }
+  ]
+}

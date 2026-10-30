@@ -1,0 +1,5 @@
+# HHhero — https://hhhero.tonydefazio.com
+# Under review: kept out of search engines until the owner approves it.
+# When it is approved, allow all crawlers (gaba_excites' policy) and add a sitemap.
+User-agent: *
+Disallow: /

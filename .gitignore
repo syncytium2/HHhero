@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.DS_Store
+*.local
+.wrangler/
+tsconfig.tsbuildinfo
+screenshots/
+
+# Local copies of papers. Never committed: this repository is public.
+lit/pdf/*
+!lit/pdf/.gitkeep

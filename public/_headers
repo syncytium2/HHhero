@@ -1,0 +1,9 @@
+# Cloudflare static-asset response headers (copied to dist/ by Vite).
+# no-transform on HTML stops Cloudflare injecting its analytics beacon at the
+# edge (it did, to colonel_kernel). X-Robots-Tag: under review, not indexed.
+/*
+  X-Robots-Tag: noindex, nofollow
+/
+  Cache-Control: public, max-age=0, must-revalidate, no-transform
+/index.html
+  Cache-Control: public, max-age=0, must-revalidate, no-transform

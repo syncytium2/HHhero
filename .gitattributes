@@ -1,0 +1,5 @@
+# Every text file is checked out with LF, on every machine. A Windows checkout
+# with core.autocrlf=true otherwise gives the shell scripts CRLF, and bash stops
+# at deploy.sh's first line (2026-10-30, the owner's workstation).
+* text=auto eol=lf
+*.sh text eol=lf

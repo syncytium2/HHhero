@@ -1,0 +1,18 @@
+{
+  // Cloudflare Workers config, assets only (gaba_excites' shape): no server
+  // script, Cloudflare serves ./dist.
+  //
+  // The custom domain is declared, not clicked: on `wrangler deploy` Cloudflare
+  // creates the DNS record and binds the hostname. Approved by the owner
+  // 2026-10-30 ("HHhero ... use the subdomain"). Checked first: the name
+  // hhhero.tonydefazio.com resolved to nothing, so this creates the record
+  // rather than taking one over.
+  "routes": [{ "pattern": "hhhero.tonydefazio.com", "custom_domain": true }],
+  "name": "hhhero",
+  "compatibility_date": "2026-09-01",
+  "workers_dev": true,
+  "preview_urls": true,
+  "assets": {
+    "directory": "./dist"
+  }
+}
