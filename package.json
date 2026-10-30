@@ -1,7 +1,7 @@
 {
   "name": "hhhero",
   "private": true,
-  "version": "0.1.3",
+  "version": "0.1.4",
   "type": "module",
   "description": "The Hodgkin–Huxley gates, two ways: edit them as rates (α, β) or as steady state and time constant (x∞, τ), and watch the currents. Phone first.",
   "scripts": {
