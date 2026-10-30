@@ -4,11 +4,11 @@ Written by `npm run deploy`. Do not edit by hand.
 
 | | |
 |---|---|
-| **Deployed at** | 2026-10-30 18:48 UTC |
-| **Version** | v0.1.3 |
-| **Commit** | `3cb05a8` — Release v0.1.3 |
-| **Bundle** | `assets/index-BXbAeQr5.js` |
-| **Worker version** | `0737ccba-9a9d-48e1-a121-ac66b3014e54` |
+| **Deployed at** | 2026-10-30 21:24 UTC |
+| **Version** | v0.1.4 |
+| **Commit** | `79598eb` — Release v0.1.4 |
+| **Bundle** | `assets/index-CQgNx6jK.js` |
+| **Worker version** | `934103e2-b5d1-492c-bfa4-61b629bd50a6` |
 | **Live** | https://hhhero.tonydefazio.workers.dev https://hhhero.tonydefazio.com |
 
 Verified at deploy time: tests pass, CSP in the shipped HTML, Born stamp baked
