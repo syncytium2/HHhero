@@ -68,3 +68,16 @@ stays in grey under every edited curve.
 **Under review, not indexed**: robots.txt disallows all, `X-Robots-Tag:
 noindex`, and no sitemap, until the owner approves. Not linked from
 gaba_excites.
+
+## 2026-10-30: first deploy, v0.1.1
+
+The owner ran the publish commands from WSL. `gh repo create` had already made
+the (empty) repository on an earlier run, and WSL has no `node`, so the deploy
+bumped the version and stopped. The bump was undone, `main` pushed, and the
+deploy run from Git Bash: v0.1.1, live at hhhero.tonydefazio.workers.dev and
+hhhero.tonydefazio.com, both serving the bundle with `X-Robots-Tag: noindex`.
+The script's own check of the custom domain was skipped because the
+university's DNS still cached the name as nonexistent (it had been looked up
+before the record existed); fetched through Cloudflare's edge directly, it
+served the deployed bundle. The deploy script now refuses to start without
+node and npm, and says to use Git Bash.
