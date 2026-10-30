@@ -21,6 +21,8 @@ step() { printf '\n\033[1m==> %s\033[0m\n' "$1"; }
 fail() { printf '\n\033[31mABORT: %s\033[0m\n' "$1" >&2; exit 1; }
 
 step "Preflight"
+# WSL on the owner's workstation has no node; a run there bumped the version and died (2026-10-30).
+command -v node >/dev/null && command -v npm >/dev/null || fail "node/npm not found here. On Windows run from Git Bash, not WSL: bash scripts/deploy.sh"
 [[ "$(git rev-parse --is-shallow-repository)" == "true" ]] && fail "shallow clone: the Born stamp would be wrong. git fetch --unshallow"
 BRANCH="$(git rev-parse --abbrev-ref HEAD)"
 [[ "$BRANCH" != "main" ]] && fail "on '$BRANCH', not main"
