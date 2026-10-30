@@ -14,8 +14,9 @@ export interface Series {
   width?: number;
   dash?: string;
   opacity?: number;
-  /** drawn at the line's right end */
+  /** drawn at the line's right end, or at its largest excursion from zero */
   label?: string;
+  labelAt?: "end" | "peak";
 }
 
 interface Props {
@@ -162,9 +163,16 @@ export function Plot({ height, series, x, y, yInclude, xLabel, yLabel, cursor, o
         </g>
         {series.map((s, k) => {
           if (!s.label) return null;
-          // the label sits at the line's last visible point
+          // the label sits at the line's last visible point, or beside its peak
           let i = s.x.length - 1;
           while (i > 0 && (s.x[i] > x[1] || !Number.isFinite(s.y[i]))) i--;
+          if (s.labelAt === "peak") {
+            let best = 0;
+            for (let j = 0; j < s.x.length; j++) if (s.x[j] <= x[1] && Math.abs(s.y[j]) > Math.abs(s.y[best])) best = j;
+            const below = s.y[best] < 0;
+            const ly = Math.max(M.t + 8, Math.min(M.t + ph - 3, sy(s.y[best]) + (below ? 13 : -5)));
+            return <text key={`l${k}`} x={Math.min(sx(s.x[best]) + 6, M.l + pw - 2)} y={ly} className="series-label" textAnchor="start" style={{ fill: s.color }}>{s.label}</text>;
+          }
           const ly = Math.max(M.t + 8, Math.min(M.t + ph - 3, sy(s.y[i]) - 4));
           return <text key={`l${k}`} x={Math.min(sx(s.x[i]), M.l + pw) - 2} y={ly} className="series-label" textAnchor="end" style={{ fill: s.color }}>{s.label}</text>;
         })}

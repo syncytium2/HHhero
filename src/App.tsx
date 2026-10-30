@@ -7,7 +7,7 @@
  * Flipping it never changes the model; it changes what you hold. Each view
  * keeps its own edits, and the other view's are shown, never hidden.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Plot, type Series } from "./ui/Plot.tsx";
 import { Slider } from "./ui/Slider.tsx";
 import {
@@ -72,6 +72,9 @@ export function App() {
   const [cursor, setCursor] = useState(-40);
   const [about, setAbout] = useState(false);
   const wide = useWide();
+  // a new view or chip starts at the top of the panel, where the notes are
+  const panelRef = useRef<HTMLDivElement>(null);
+  useEffect(() => { if (panelRef.current) panelRef.current.scrollTop = 0; }, [view, sel]);
 
   const md = useMemo(() => buildModel(p), [p]);
   const cv = useMemo(() => curves(md, gate), [md, gate]);
@@ -101,7 +104,7 @@ export function App() {
   const gp = p.gates[gate];
   const H = wide
     ? { curve: 260, sim: 300, sim2: 200 }
-    : { curve: 150, sim: 170, sim2: 92 };
+    : { curve: 136, sim: 150, sim2: 80 };
 
   // ------------------------------------------------------------ curves
   const curvePlots =
@@ -210,15 +213,15 @@ export function App() {
         ? [
             { x: apStock.t, y: mA(apStock.iNa), color: C.stock, width: 2.5 },
             { x: apStock.t, y: mA(apStock.iK), color: C.stock, width: 2.5, dash: "5 4" },
-            { x: ap.t, y: mA(ap.iNa), color: C.na, label: "INa" },
-            { x: ap.t, y: mA(ap.iK), color: C.k, dash: "5 4", label: "IK" },
+            { x: ap.t, y: mA(ap.iNa), color: C.na, label: "INa", labelAt: "peak" },
+            { x: ap.t, y: mA(ap.iK), color: C.k, dash: "5 4", label: "IK", labelAt: "peak" },
           ]
         : spikeTrace === "g"
           ? [
               { x: apStock.t, y: apStock.gNa, color: C.stock, width: 2.5 },
               { x: apStock.t, y: apStock.gK, color: C.stock, width: 2.5, dash: "5 4" },
-              { x: ap.t, y: ap.gNa, color: C.na, label: "gNa" },
-              { x: ap.t, y: ap.gK, color: C.k, dash: "5 4", label: "gK" },
+              { x: ap.t, y: ap.gNa, color: C.na, label: "gNa", labelAt: "peak" },
+              { x: ap.t, y: ap.gK, color: C.k, dash: "5 4", label: "gK", labelAt: "peak" },
             ]
           : GATE_IDS.map((id) => ({ x: ap.t, y: ap[id], color: C[id], label: id }) as Series);
     simPlot = (
@@ -284,6 +287,8 @@ export function App() {
     const vh = md.g[id].vHalfBase;
     controls = (
       <>
+        {note && <p className="note">{note}</p>}
+        {other}
         {view === "ab" ? (
           <>
             {rateRows("alpha")}
@@ -304,8 +309,6 @@ export function App() {
             <p className="hint">₀ is the curve the α, β constants give. {id}∞ = α/(α+β), τ = 1/(φ(α+β)).</p>
           </>
         )}
-        {note && <p className="note">{note}</p>}
-        {other}
       </>
     );
   } else if (sel === "na") {
@@ -387,7 +390,7 @@ export function App() {
                 <button key={id} className={gate === id ? "on" : ""} style={{ color: C[id] }} onClick={() => pick(id)}>{id}</button>
               ))}
             </span>
-            <span className="muted">{view === "ab" ? "rates" : "steady state and time constant"} · {fmt(p.celsius)} °C · grey: stock</span>
+            <span className="muted">{fmt(p.celsius)} °C · grey = stock</span>
           </div>
           {curvePlots}
           {readout}
@@ -396,8 +399,8 @@ export function App() {
         <section className="card sim" aria-label="simulation">
           <div className="card-head">
             <span className="tabs">
-              <button className={tab === "clamp" ? "on" : ""} onClick={() => setTab("clamp")}>Voltage clamp</button>
-              <button className={tab === "spike" ? "on" : ""} onClick={() => setTab("spike")}>Action potential</button>
+              <button className={tab === "clamp" ? "on" : ""} aria-label="Voltage clamp" onClick={() => setTab("clamp")}>{wide ? "Voltage clamp" : "Clamp"}</button>
+              <button className={tab === "spike" ? "on" : ""} aria-label="Spike (action potential)" onClick={() => setTab("spike")}>{wide ? "Action potential" : "Spike"}</button>
             </span>
             <span className="tabs small">
               {tab === "clamp"
@@ -422,7 +425,7 @@ export function App() {
             </button>
           ))}
         </div>
-        <div className="panel">
+        <div className="panel" ref={panelRef}>
           {controls}
           <div className="resets">
             <button onClick={resetSel} disabled={!edited(sel)}>Reset {chips.find((c) => c.id === sel)!.label}</button>
