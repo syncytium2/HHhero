@@ -5,9 +5,9 @@
  * cursor (phones have no hover), and the plot claims the gesture so the page
  * does not scroll under the finger.
  */
-import { useEffect, useRef, useState, type PointerEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent } from "react";
 import { spreadLabels } from "./labels.ts";
-import { isFull, pinchView, type Range } from "./zoom.ts";
+import { isFull, pinchView, selectView, wheelView, type Range } from "./zoom.ts";
 
 export interface Series {
   x: ArrayLike<number>;
@@ -51,9 +51,11 @@ const MARGIN = { l: 42, r: 10, t: 16, b: 26 };
 function useWidth() {
   const ref = useRef<HTMLDivElement>(null);
   const [w, setW] = useState(320);
-  useEffect(() => {
+  // measure before the first paint, so the plot never shows (or takes input) at the placeholder width
+  useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
+    setW(Math.max(120, Math.floor(el.getBoundingClientRect().width)));
     const ro = new ResizeObserver(([e]) => setW(Math.max(120, Math.floor(e.contentRect.width))));
     ro.observe(el);
     return () => ro.disconnect();
@@ -135,10 +137,32 @@ export function Plot({ height, series: raw, x: full, y, yInclude, xLabel, yLabel
   };
   const down = useRef(false);
 
-  // ---- zoom gestures: pointers by id; two make a pinch, one pans; a quick second tap resets
+  // ---- mouse: drag selects a window to zoom into (the band), wheel zooms, sideways wheel pans
+  const [band, setBand] = useState<[number, number] | null>(null); // drawn only
+  const dragFrom = useRef<number | null>(null); // where a mouse drag began, as a fraction of the width
+  const svgRef = useRef<SVGSVGElement>(null);
+  const live = useRef({ zoom, full, pw, l: M.l });
+  live.current = { zoom, full, pw, l: M.l };
+  const hasZoom = !!zoom;
+  useEffect(() => {
+    const svg = svgRef.current;
+    if (!svg || !hasZoom) return;
+    const onWheel = (e: WheelEvent) => {
+      const { zoom: z, full: fr, pw: w, l } = live.current;
+      if (!z) return;
+      e.preventDefault();
+      const f = Math.max(0, Math.min(1, (e.clientX - svg.getBoundingClientRect().left - l) / w));
+      const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 400 : 1; // lines or pages to pixels
+      z.onView(wheelView(z.view, fr, f, e.deltaX * unit, e.deltaY * unit, e.ctrlKey, w, z.minSpan));
+    };
+    svg.addEventListener("wheel", onWheel, { passive: false });
+    return () => svg.removeEventListener("wheel", onWheel);
+  }, [hasZoom]);
+
+  // ---- touch: pointers by id; two make a pinch, one pans; a quick second tap resets
   const pts = useRef(new Map<number, number>());
   const gesture = useRef<{ view0: Range; f0: number; d0: number } | null>(null);
-  const lastTap = useRef(0);
+  const lastTap = useRef(-Infinity); // time of the last tap; -Infinity: none yet (a press soon after load is not a double-tap)
   const frac = (clientX: number, svg: SVGSVGElement) => (clientX - svg.getBoundingClientRect().left - M.l) / pw;
   const startGesture = (svg: SVGSVGElement) => {
     const xs = [...pts.current.values()];
@@ -150,15 +174,26 @@ export function Plot({ height, series: raw, x: full, y, yInclude, xLabel, yLabel
       const now = e.timeStamp;
       if (pts.current.size === 0 && now - lastTap.current < 300) {
         zoom.onView(full);
-        lastTap.current = 0;
+        lastTap.current = -Infinity;
         return;
       }
       if (pts.current.size === 0) lastTap.current = now;
       try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* synthetic pointers in tests */ }
+      if (e.pointerType === "mouse") {
+        const f = Math.max(0, Math.min(1, frac(e.clientX, e.currentTarget)));
+        dragFrom.current = f;
+        setBand([f, f]);
+        return;
+      }
       pts.current.set(e.pointerId, e.clientX);
       startGesture(e.currentTarget);
     },
     onPointerMove: (e: PointerEvent<SVGSVGElement>) => {
+      if (e.pointerType === "mouse") {
+        const f0 = dragFrom.current;
+        if (f0 !== null) setBand([f0, Math.max(0, Math.min(1, frac(e.clientX, e.currentTarget)))]);
+        return;
+      }
       if (!pts.current.has(e.pointerId) || !gesture.current) return;
       pts.current.set(e.pointerId, e.clientX);
       const xs = [...pts.current.values()];
@@ -166,15 +201,27 @@ export function Plot({ height, series: raw, x: full, y, yInclude, xLabel, yLabel
       const g = gesture.current;
       const ratio = xs.length > 1 ? (Math.abs(xs[0] - xs[1]) || 1) / g.d0 : 1;
       if (xs.length === 1 && isFull(g.view0, full)) return; // nothing to pan
-      if (Math.abs(mid - (g.f0 * pw + e.currentTarget.getBoundingClientRect().left + M.l)) > 6 || ratio !== 1) lastTap.current = 0;
+      if (Math.abs(mid - (g.f0 * pw + e.currentTarget.getBoundingClientRect().left + M.l)) > 6 || ratio !== 1) lastTap.current = -Infinity;
       zoom.onView(pinchView(g.view0, full, g.f0, frac(mid, e.currentTarget), ratio, zoom.minSpan));
     },
     onPointerUp: (e: PointerEvent<SVGSVGElement>) => {
+      if (e.pointerType === "mouse") {
+        const f0 = dragFrom.current, f1 = Math.max(0, Math.min(1, frac(e.clientX, e.currentTarget)));
+        dragFrom.current = null;
+        setBand(null);
+        if (f0 !== null && Math.abs(f1 - f0) * pw > 4) {
+          zoom.onView(selectView(zoom.view, full, f0, f1, zoom.minSpan));
+          lastTap.current = -Infinity;
+        }
+        return;
+      }
       pts.current.delete(e.pointerId);
       if (pts.current.size) startGesture(e.currentTarget);
       else gesture.current = null;
     },
     onPointerCancel: (e: PointerEvent<SVGSVGElement>) => {
+      setBand(null);
+      dragFrom.current = null;
       pts.current.delete(e.pointerId);
       gesture.current = null;
     },
@@ -186,11 +233,12 @@ export function Plot({ height, series: raw, x: full, y, yInclude, xLabel, yLabel
         <button className="zoom-reset" onClick={() => zoom.onView(full)}>Reset zoom</button>
       )}
       <svg
+        ref={svgRef}
         width={width}
         height={height}
         role="img"
         aria-label={ariaLabel}
-        style={{ touchAction: onCursor || zoom ? "none" : "pan-y" }}
+        style={{ touchAction: onCursor || zoom ? "none" : "pan-y", cursor: zoom ? "crosshair" : undefined }}
         onPointerDown={zoomHandlers ? zoomHandlers.onPointerDown : onCursor ? (e) => { down.current = true; e.currentTarget.setPointerCapture(e.pointerId); onCursor(toX(e)); } : undefined}
         onPointerMove={zoomHandlers ? zoomHandlers.onPointerMove : onCursor ? (e) => { if (down.current) onCursor(toX(e)); } : undefined}
         onPointerUp={zoomHandlers ? zoomHandlers.onPointerUp : onCursor ? () => (down.current = false) : undefined}
@@ -256,6 +304,7 @@ export function Plot({ height, series: raw, x: full, y, yInclude, xLabel, yLabel
           });
           return out;
         })()}
+        {band && <rect x={M.l + Math.min(band[0], band[1]) * pw} y={M.t} width={Math.abs(band[1] - band[0]) * pw} height={ph} className="band" />}
         {cursor !== undefined && cursor >= x[0] && cursor <= x[1] && (
           <g>
             <line x1={sx(cursor)} x2={sx(cursor)} y1={M.t} y2={M.t + ph} className="cursor" />

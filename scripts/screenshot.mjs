@@ -141,6 +141,28 @@ await phone.getByRole("button", { name: "Close" }).tap();
 // ---------------------------------------------------------------- wide
 const wide = await open({ viewport: { width: 1440, height: 900 } });
 await wide.screenshot({ path: `${out}/wide-ab.png` });
+// the mouse: drag across the traces zooms to the dragged window; double-click resets; the wheel zooms
+const wSel = 'svg[aria-label="sodium current family"]';
+const wTick = async () => wide.evaluate((sel) => { const t = [...document.querySelectorAll(`${sel} .tick`)].filter((e) => e.getAttribute("text-anchor") === "middle"); return parseFloat(t[t.length - 1].textContent); }, wSel);
+const tb = await wide.locator(wSel).boundingBox();
+const full0 = await wTick();
+await wide.mouse.move(tb.x + tb.width * 0.2, tb.y + tb.height / 2);
+await wide.mouse.down();
+await wide.mouse.move(tb.x + tb.width * 0.4, tb.y + tb.height / 2, { steps: 6 });
+await wide.mouse.up();
+await wide.waitForTimeout(150);
+const dragged = await wTick();
+if (!(dragged < full0)) problems.push(`wide: dragging across the traces did not zoom (${full0} -> ${dragged})`);
+await wide.screenshot({ path: `${out}/wide-zoomed.png` });
+await wide.mouse.dblclick(tb.x + tb.width * 0.5, tb.y + tb.height / 2);
+await wide.waitForTimeout(150);
+if ((await wTick()) !== full0) problems.push("wide: double-click did not reset the zoom");
+await wide.mouse.move(tb.x + tb.width * 0.3, tb.y + tb.height / 2);
+await wide.mouse.wheel(0, -400);
+await wide.waitForTimeout(150);
+if (!((await wTick()) < full0)) problems.push("wide: the wheel did not zoom");
+await wide.getByRole("button", { name: "Reset zoom" }).click();
+if (!(await wide.getByText("Drag across the traces").count())) problems.push("wide: no mouse zoom hint");
 await noSideways(wide, "wide");
 await wide.getByRole("radio", { name: "x∞, τ" }).click();
 await wide.waitForTimeout(150);

@@ -32,3 +32,27 @@ export function pinchView(view0: Range, full: Range, f0: number, f1: number, rat
 export function isFull(v: Range, full: Range): boolean {
   return Math.abs(v[0] - full[0]) < 1e-9 && Math.abs(v[1] - full[1]) < 1e-9;
 }
+
+/** The view after a mouse drag from fraction f0 to f1 of the plot's width: the dragged window, in either direction. */
+export function selectView(view: Range, full: Range, f0: number, f1: number, minSpan: number): Range {
+  const span = view[1] - view[0];
+  const a = view[0] + Math.min(f0, f1) * span, b = view[0] + Math.max(f0, f1) * span;
+  const mid = (a + b) / 2;
+  const w = Math.max(minSpan, b - a);
+  return clampView([mid - w / 2, mid + w / 2], full, minSpan);
+}
+
+/**
+ * The view after a wheel event at fraction f of the plot's width. Vertical
+ * wheel (and a trackpad pinch, which browsers send as a wheel with ctrlKey)
+ * zooms about the pointer; a sideways scroll pans.
+ */
+export function wheelView(view: Range, full: Range, f: number, dx: number, dy: number, ctrl: boolean, plotWidthPx: number, minSpan: number): Range {
+  const span = view[1] - view[0];
+  if (!ctrl && Math.abs(dx) > Math.abs(dy)) {
+    const shift = (dx / plotWidthPx) * span;
+    return clampView([view[0] + shift, view[1] + shift], full, minSpan);
+  }
+  const ratio = Math.exp(-dy * (ctrl ? 0.01 : 0.002));
+  return pinchView(view, full, f, f, ratio, minSpan);
+}

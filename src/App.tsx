@@ -31,6 +31,17 @@ const C = {
   ink: "var(--ink)", stock: "var(--stock)",
 };
 
+function useMedia(q: string) {
+  const [on, setOn] = useState(() => typeof matchMedia !== "undefined" && matchMedia(q).matches);
+  useEffect(() => {
+    const m = matchMedia(q);
+    const f = () => setOn(m.matches);
+    m.addEventListener("change", f);
+    return () => m.removeEventListener("change", f);
+  }, [q]);
+  return on;
+}
+
 function useWide() {
   const q = "(min-width: 900px)";
   const [wide, setWide] = useState(() => typeof matchMedia !== "undefined" && matchMedia(q).matches);
@@ -78,6 +89,8 @@ export function App() {
   const [clampX, setClampX] = useState<Range | null>(null);
   const [spikeX, setSpikeX] = useState<Range | null>(null);
   const wide = useWide();
+  // a mouse or trackpad (hover and a fine pointer) gets the desktop zoom hint; touch gets the gestures
+  const mouse = useMedia("(hover: hover) and (pointer: fine)");
   // a new view or chip starts at the top of the panel, where the notes are
   const panelRef = useRef<HTMLDivElement>(null);
   useEffect(() => { if (panelRef.current) panelRef.current.scrollTop = 0; }, [view, sel]);
@@ -501,7 +514,7 @@ export function App() {
           {simPlot}
           <p className="caption">
             {tab === "clamp" ? "Ideal clamp, no electrode: what no rig records." : "The membrane alone, no electrode."}
-            {(tab === "spike" || clampTrace !== "iv") && !zoomOn && " Pinch to zoom time, drag to pan, double-tap to reset."}
+            {(tab === "spike" || clampTrace !== "iv") && !zoomOn && (mouse ? " Drag across the traces or scroll to zoom time; double-click to reset." : " Pinch to zoom time, drag to pan, double-tap to reset.")}
             {zoomOn && (
               <button className="zoom-reset" onClick={() => (tab === "clamp" ? setClampX(null) : setSpikeX(null))}>Reset zoom</button>
             )}

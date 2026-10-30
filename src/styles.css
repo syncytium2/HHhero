@@ -64,6 +64,7 @@ a { color: inherit; }
 .tick { font-size: 10.5px; fill: var(--muted); }
 .axis-label { font-size: 11px; fill: var(--muted); }
 .series-label { font-size: 12px; font-weight: 700; paint-order: stroke; stroke: var(--card); stroke-width: 3px; }
+.band { fill: var(--ink); opacity: 0.12; }
 .cursor { stroke: var(--ink); stroke-width: 1; stroke-dasharray: 2 3; }
 .readout { margin: 0; font-size: 12px; padding: 0 2px 2px; font-variant-numeric: tabular-nums; line-height: 1.3; }
 .caption { margin: 0; font-size: 11.5px; color: var(--muted); padding: 0 2px; }

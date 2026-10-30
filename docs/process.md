@@ -107,3 +107,23 @@ the protocol in the second row"; and "kill the british spellings everywhere".
   reset restored it.
 - **American spelling everywhere**: "centre" and "grey" were in the UI and
   comments; now "center" and "gray".
+
+## 2026-10-30: zoom with a mouse
+
+The owner, on the university workstation: "can we detect if we're on a desktop
+and there are no gestures? click and drag doesn't zoom". No separate desktop
+mode was needed: every pointer event says whether it came from a mouse, a
+finger or a pen, so the plot answers each in its own way. With a mouse, drag
+across the traces to zoom to the dragged window (a shaded band shows it),
+scroll to zoom about the pointer, scroll sideways to pan, double-click to
+reset. A trackpad pinch reaches the page as a wheel event with ctrlKey, so it
+zooms too. Touch is unchanged. The caption shows the mouse hint when the
+device can hover with a fine pointer, and the touch hint otherwise. The
+arithmetic is in `src/ui/zoom.ts` (`selectView`, `wheelView`), tested; the
+screenshot check drags, double-clicks and scrolls with a real mouse.
+
+Two bugs found on the way, both now fixed. Plots started at a placeholder
+width and measured themselves after the first paint, so a drag started in
+that moment mapped to the wrong times; they now measure before painting. And
+the double-tap timer started at time zero, so a press within 300 ms of the
+page loading counted as a double-tap and reset the zoom.
