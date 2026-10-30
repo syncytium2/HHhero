@@ -208,3 +208,72 @@ export function spikeTimes(t: ArrayLike<number>, v: ArrayLike<number>): number[]
   }
   return out;
 }
+
+// ---------------------------------------------------------------- threshold, for stepping through
+
+/**
+ * Does this pulse fire the cell, from the settled state `from`? A −20 mV
+ * crossing after the pulse starts, carried by the cell's own sodium current:
+ * its peak inward INa must exceed the pulse. Without that, a big enough pulse
+ * would cross −20 mV on its own, with no channel involved.
+ */
+export function fires(md: Model, stim: Stimulus, from: State, dt: number): boolean {
+  const r = freeRun(md, stim, from, dt, 5);
+  if (!spikeTimes(r.t, r.v).some((t) => t >= stim.start)) return false;
+  let inward = 0;
+  for (let i = 0; i < r.t.length; i++) if (r.t[i] >= stim.start && -r.iNa[i] > inward) inward = -r.iNa[i];
+  return inward > Math.abs(stim.amp);
+}
+
+/**
+ * The smallest pulse amplitude (µA/cm²) that fires the cell, to `rel`, by
+ * bisection; the pulse's length and the hold come from `stim`. Null when the
+ * cell fires with no pulse (it is already firing) or not even at `maxAmp`.
+ */
+export function pulseThreshold(md: Model, stim: Stimulus, from: State, dt: number, maxAmp = 2000, rel = 1e-4): number | null {
+  if (fires(md, { ...stim, amp: 0 }, from, dt)) return null;
+  let hi = Math.max(1, stim.amp);
+  while (!fires(md, { ...stim, amp: hi }, from, dt)) {
+    hi *= 2;
+    if (hi > maxAmp) return null;
+  }
+  let lo = 0;
+  while (hi - lo > rel * hi) {
+    const mid = (lo + hi) / 2;
+    if (fires(md, { ...stim, amp: mid }, from, dt)) hi = mid;
+    else lo = mid;
+  }
+  return hi;
+}
+
+export interface LadderStep {
+  amp: number;
+  /** a rung placed against the threshold itself */
+  role?: "under" | "over" | "strong";
+}
+
+/** 1, 2, 2.5 or 5 times a power of ten, the nearest at or below x. */
+export function niceStep(x: number): number {
+  const p = Math.pow(10, Math.floor(Math.log10(x)));
+  const f = x / p;
+  return (f >= 5 ? 5 : f >= 2.5 ? 2.5 : f >= 2 ? 2 : 1) * p;
+}
+
+/**
+ * The amplitudes to step through: even, round steps below threshold, then
+ * 1% under and 1% over it (all or none), then twice it (a shorter delay).
+ * With no threshold, quarters of `amp`.
+ */
+export function thresholdLadder(thr: number | null, amp: number): LadderStep[] {
+  if (thr === null) return [0.25, 0.5, 0.75, 1].map((f) => ({ amp: f * Math.abs(amp || 1) }));
+  const d = niceStep(thr / 6);
+  const out: LadderStep[] = [];
+  for (let k = 1; k * d < 0.97 * thr; k++) out.push({ amp: k * d });
+  out.push({ amp: 0.99 * thr, role: "under" }, { amp: 1.01 * thr, role: "over" }, { amp: 2 * thr, role: "strong" });
+  return out;
+}
+
+/** Your own pulses to step through: `count` of them, from `first`, `by` apart. */
+export function evenLadder(first: number, by: number, count: number): LadderStep[] {
+  return Array.from({ length: Math.max(1, Math.round(count)) }, (_, j) => ({ amp: first + j * by }));
+}

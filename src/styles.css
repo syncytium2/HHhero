@@ -56,6 +56,15 @@ a { color: inherit; }
 .tabs.small button { min-width: 44px; }
 .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; }
 .plot { width: 100%; min-width: 0; position: relative; }
+.step-btn { min-width: 44px; min-height: 36px; font-size: 13px; padding: 0 8px; }
+.sim .card-head { gap: 6px; }
+.sim .tabs button { padding: 0 8px; }
+.stepper { display: grid; grid-template-columns: 52px 1fr 52px; gap: 6px; align-items: center; padding: 2px 0; }
+.stepper button { min-height: 44px; padding: 0; font-size: 24px; line-height: 1; }
+.step-text { font-size: 13px; text-align: center; font-variant-numeric: tabular-nums; line-height: 1.25; }
+.app.wide .step-text { font-size: 16px; }
+.ladder-pick { display: flex; gap: 6px; margin: 4px 0 6px; }
+.ladder-pick button { flex: 1; min-height: 44px; }
 .zoom-reset { min-height: 44px; margin-left: 8px; font-size: 13px; }
 .caption { display: flex; align-items: center; flex-wrap: wrap; }
 .plot svg { display: block; user-select: none; -webkit-user-select: none; }

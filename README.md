@@ -19,6 +19,11 @@ both x∞ and τ. In the x∞, τ view you can move one and leave the other alon
 That difference is the lesson. Each view keeps its own edits; a gate edited
 in the other view says so, with a reset.
 
+For teaching from the front, the Step switch over the traces walks the
+voltage-clamp family one sweep at a time, or a ladder of current pulses up to
+and across threshold (your own ladder, if you set one in Protocol). The arrow
+keys and a presentation clicker step too.
+
 ## The model
 
 The space-clamped squid axon of Hodgkin & Huxley (1952) J Physiol 117:500–544

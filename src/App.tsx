@@ -16,12 +16,16 @@ import {
   type GateId, type GateParams, type Rate,
 } from "./core/rates.ts";
 import { buildModel, stockParams, type Model, type Params } from "./core/model.ts";
-import { clampFamily, DEFAULT_CLAMP, DEFAULT_STIM, freeRun, settle, type ClampProtocol, type Stimulus } from "./core/sim.ts";
+import {
+  clampFamily, DEFAULT_CLAMP, DEFAULT_STIM, evenLadder, fires, freeRun, niceStep, pulseThreshold, settle, thresholdLadder,
+  type ClampProtocol, type Stimulus,
+} from "./core/sim.ts";
 import { noteFor, type View } from "./core/notes.ts";
 import { BORN, VERSION } from "./version.ts";
 
 type Sel = GateId | "na" | "k" | "mem" | "proto";
 type SimTab = "clamp" | "spike";
+interface LadderSpec { first: number; by: number; count: number }
 
 const STOCK = stockParams();
 const STOCK_MODEL = buildModel(STOCK);
@@ -87,6 +91,12 @@ export function App() {
   const [cursor, setCursor] = useState(-40);
   const [about, setAbout] = useState(false);
   const [clampX, setClampX] = useState<Range | null>(null);
+  // stepping through: one sweep at a time, forward and back, for teaching from the front of a room
+  const [stepping, setStepping] = useState(false);
+  const [clampK, setClampK] = useState(0);
+  const [spikeK, setSpikeK] = useState(0);
+  // the pulses to step through: null is the ladder built around this cell's threshold
+  const [ladderSpec, setLadderSpec] = useState<LadderSpec | null>(null);
   const [spikeX, setSpikeX] = useState<Range | null>(null);
   const wide = useWide();
   // a mouse or trackpad (hover and a fine pointer) gets the desktop zoom hint; touch gets the gestures
@@ -102,6 +112,58 @@ export function App() {
   const sweepMs = Math.max(40, stim.start + stim.dur + 25);
   const ap = useMemo(() => spike(md, { ...stim, sweep: sweepMs }), [md, stim, sweepMs]);
   const apStock = useMemo(() => spike(STOCK_MODEL, { ...stim, sweep: sweepMs }), [stim, sweepMs]);
+
+  // the pulses to step through: even steps up to this cell's threshold, then across it; or your own
+  const ladder = useMemo(() => {
+    if (!stepping || tab !== "spike") return null;
+    const st = { ...stim, sweep: sweepMs };
+    const from = settle(md, st.hold, SETTLE_MS, DT);
+    const thr = pulseThreshold(md, st, from, DT);
+    const base = ladderSpec ? evenLadder(ladderSpec.first, ladderSpec.by, ladderSpec.count) : thresholdLadder(thr, st.amp);
+    const rungs = base.map((r) => ({
+      ...r,
+      fired: fires(md, { ...st, amp: r.amp }, from, DT),
+      run: freeRun(md, { ...st, amp: r.amp }, from, DT, 5),
+    }));
+    return { thr, rungs };
+  }, [md, stim, sweepMs, stepping, tab, ladderSpec]);
+  // the even part of the threshold ladder, as a starting point for your own
+  const autoSpec = useMemo((): LadderSpec | null => {
+    if (sel !== "proto") return null;
+    const st = { ...stim, sweep: sweepMs };
+    const thr = pulseThreshold(md, st, settle(md, st.hold, SETTLE_MS, DT), DT);
+    if (thr === null) { const a = Math.abs(stim.amp || 1) / 4; return { first: a, by: a, count: 4 }; }
+    const d = niceStep(thr / 6);
+    return { first: d, by: d, count: Math.floor(thr / d) + 2 };
+  }, [sel, md, stim, sweepMs]);
+  const nSteps = tab === "clamp" ? fam.length : ladder?.rungs.length ?? 1;
+  const k = Math.min(tab === "clamp" ? clampK : spikeK, nSteps - 1);
+  const go = (d: number) => (tab === "clamp" ? setClampK : setSpikeK)(Math.max(0, Math.min(nSteps - 1, k + d)));
+  const rung = ladder ? ladder.rungs[k] : null;
+  const rungAmp = rung?.amp;
+  const rungStock = useMemo(
+    () => (rungAmp === undefined ? null : spike(STOCK_MODEL, { ...stim, sweep: sweepMs, amp: rungAmp })),
+    [rungAmp, stim, sweepMs],
+  );
+  const apShown = rung ? rung.run : ap;
+  const apStockShown = rungStock ?? apStock;
+  // arrow keys, Page Up and Page Down (what a presentation clicker sends) step too, unless a control has the keys
+  const goRef = useRef(go);
+  goRef.current = go;
+  useEffect(() => {
+    if (!stepping) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.target instanceof Element && e.target.closest("input, textarea, select, [contenteditable]")) return;
+      if (e.key === "ArrowRight" || e.key === "PageDown") { e.preventDefault(); goRef.current(1); }
+      else if (e.key === "ArrowLeft" || e.key === "PageUp") { e.preventDefault(); goRef.current(-1); }
+    };
+    addEventListener("keydown", onKey);
+    return () => removeEventListener("keydown", onKey);
+  }, [stepping]);
+  const toggleStepping = () => {
+    if (!stepping) { setClampK(0); setSpikeK(0); }
+    setStepping(!stepping);
+  };
 
   // choosing a gate to edit also draws it; the curve card's buttons toggle what is drawn
   const pick = (s: Sel) => {
@@ -120,7 +182,7 @@ export function App() {
     if (s === "na") return p.gNa !== STOCK.gNa || p.eNa !== STOCK.eNa || p.pm !== STOCK.pm || p.ph !== STOCK.ph;
     if (s === "k") return p.gK !== STOCK.gK || p.eK !== STOCK.eK || p.pn !== STOCK.pn;
     if (s === "mem") return p.celsius !== STOCK.celsius || p.gL !== STOCK.gL || p.eL !== STOCK.eL || p.cm !== STOCK.cm;
-    return JSON.stringify(clamp) !== JSON.stringify(DEFAULT_CLAMP) || JSON.stringify(stim) !== JSON.stringify(DEFAULT_STIM);
+    return JSON.stringify(clamp) !== JSON.stringify(DEFAULT_CLAMP) || JSON.stringify(stim) !== JSON.stringify(DEFAULT_STIM) || ladderSpec !== null;
   };
   const anyEdited = (["m", "h", "n", "na", "k", "mem", "proto"] as Sel[]).some(edited);
 
@@ -201,7 +263,16 @@ export function App() {
   // ------------------------------------------------------------ simulation
   const mA = (a: Float64Array) => a.map((x) => x / 1000);
   const n = fam.length;
-  const shade = (k: number) => 0.35 + (0.65 * k) / Math.max(1, n - 1);
+  const shade = (j: number) => 0.35 + (0.65 * j) / Math.max(1, n - 1);
+  // stepping: the sweeps so far, earlier ones faded, this one bold; the axes stay where the whole family puts them
+  const upTo = <T,>(a: T[]) => (stepping ? a.slice(0, k + 1) : a);
+  const fade = (j: number) => (stepping ? (j < k ? 0.25 : 1) : shade(j));
+  const bold = (j: number) => (stepping && j === k ? 2.2 : undefined);
+  const extent = (arrs: ArrayLike<number>[]) => {
+    let lo = 0, hi = 0;
+    for (const a of arrs) for (let i = 0; i < a.length; i++) { if (a[i] < lo) lo = a[i]; if (a[i] > hi) hi = a[i]; }
+    return [lo, hi];
+  };
   // one horizontal zoom per experiment, shared by every plot on its time axis
   const clampFull: Range = [0, clamp.pre + clamp.dur];
   const spikeFull: Range = [0, sweepMs];
@@ -222,12 +293,12 @@ export function App() {
         noXTicks
         yInclude={[clamp.hold, clamp.from, clamp.to]}
         yLabel={`command V (mV): hold ${fmt(clamp.hold)}, steps ${fmt(clamp.from)} to ${fmt(clamp.to)} by ${fmt(clamp.by)}`}
-        series={steps.map((v, k) => ({
+        series={upTo(steps).map((v, j) => ({
           x: [0, clamp.pre, clamp.pre, clamp.pre + clamp.dur],
           y: [clamp.hold, clamp.hold, v, v],
           color: C.ink,
-          width: 1.2,
-          opacity: shade(k),
+          width: bold(j) ?? 1.2,
+          opacity: fade(j),
         }))}
       />
     ) : (
@@ -237,37 +308,38 @@ export function App() {
         x={spikeFull}
         zoom={spikeZoom}
         noXTicks
-        yInclude={[0, stim.hold, stim.hold + stim.amp]}
-        yLabel={`injected I (µA/cm²): ${fmt(stim.amp)} for ${fmt(stim.dur)} ms at ${fmt(stim.start)} ms`}
-        series={[
-          {
-            x: [0, stim.start, stim.start, stim.start + stim.dur, stim.start + stim.dur, sweepMs],
-            y: [stim.hold, stim.hold, stim.hold + stim.amp, stim.hold + stim.amp, stim.hold, stim.hold],
-            color: C.ink,
-            width: 1.4,
-          },
-        ]}
+        yInclude={[0, stim.hold, ...(ladder ? ladder.rungs.map((r) => stim.hold + r.amp) : [stim.hold + stim.amp])]}
+        yLabel={`injected I (µA/cm²): ${fmt(rungAmp ?? stim.amp)} for ${fmt(stim.dur)} ms at ${fmt(stim.start)} ms`}
+        series={(ladder ? ladder.rungs.slice(0, k + 1).map((r) => r.amp) : [stim.amp]).map((a, j) => ({
+          x: [0, stim.start, stim.start, stim.start + stim.dur, stim.start + stim.dur, sweepMs],
+          y: [stim.hold, stim.hold, stim.hold + a, stim.hold + a, stim.hold, stim.hold],
+          color: C.ink,
+          width: ladder ? bold(j) ?? 1.2 : 1.4,
+          opacity: ladder ? fade(j) : 1,
+        }))}
       />
     );
 
   let simPlot;
   if (tab === "clamp") {
     if (clampTrace === "iv") {
-      const vs = fam.map((s) => s.v);
+      // stepping builds the curve a point at a time, on the axes the whole family needs
+      const vs = upTo(fam.map((s) => s.v));
+      const pk = (f: typeof fam, which: "iNaPeak" | "iKEnd") => upTo(f.map((s) => s[which] / 1000));
       simPlot = (
         <Plot
           height={H.sim}
           ariaLabel="current-voltage relation"
           x={[clamp.from - 5, clamp.to + 5]}
           zeroLine
-          yInclude={[0]}
+          yInclude={extent([fam, famStock].flatMap((f) => [f.map((s) => s.iNaPeak / 1000), f.map((s) => s.iKEnd / 1000)]))}
           xLabel="test potential (mV)"
           yLabel="I (mA/cm²)"
           series={[
-            { x: vs, y: famStock.map((s) => s.iNaPeak / 1000), color: C.stock, width: 3 },
-            { x: vs, y: famStock.map((s) => s.iKEnd / 1000), color: C.stock, width: 3, dash: "5 4" },
-            { x: vs, y: fam.map((s) => s.iNaPeak / 1000), color: C.na, label: "INa peak" },
-            { x: vs, y: fam.map((s) => s.iKEnd / 1000), color: C.k, dash: "5 4", label: "IK end" },
+            { x: vs, y: pk(famStock, "iNaPeak"), color: C.stock, width: 3 },
+            { x: vs, y: pk(famStock, "iKEnd"), color: C.stock, width: 3, dash: "5 4" },
+            { x: vs, y: pk(fam, "iNaPeak"), color: C.na, label: "INa peak", dots: stepping },
+            { x: vs, y: pk(fam, "iKEnd"), color: C.k, dash: "5 4", label: "IK end", dots: stepping },
           ]}
         />
       );
@@ -281,17 +353,18 @@ export function App() {
           x={clampFull}
           zoom={clampZoom}
           zeroLine
-          yInclude={[0]}
+          yInclude={stepping ? extent([...fam, ...famStock].map((s) => mA(s[key]))) : [0]}
           xLabel="ms"
           yLabel={`${key === "iNa" ? "INa" : "IK"} (mA/cm²)`}
           series={[
-            ...famStock.map((s) => ({ x: s.t, y: mA(s[key]), color: C.stock, width: 2.5 }) as Series),
-            ...fam.map((s, k) => ({ x: s.t, y: mA(s[key]), color: col, width: 1.4, opacity: shade(k) }) as Series),
+            ...(stepping ? [famStock[k]] : famStock).map((s) => ({ x: s.t, y: mA(s[key]), color: C.stock, width: 2.5 }) as Series),
+            ...upTo(fam).map((s, j) => ({ x: s.t, y: mA(s[key]), color: col, width: bold(j) ?? 1.4, opacity: fade(j) }) as Series),
           ]}
         />
       );
     }
   } else {
+    const ap = apShown, apStock = apStockShown;
     const second: Series[] =
       spikeTrace === "i"
         ? [
@@ -320,7 +393,8 @@ export function App() {
           yLabel="V (mV)"
           series={[
             { x: apStock.t, y: apStock.v, color: C.stock, width: 3 },
-            { x: ap.t, y: ap.v, color: C.ink, label: "V" },
+            ...(ladder ? ladder.rungs.slice(0, k).map((r) => ({ x: r.run.t, y: r.run.v, color: C.ink, width: 1.2, opacity: 0.25 }) as Series) : []),
+            { x: ap.t, y: ap.v, color: C.ink, label: "V", width: ladder ? 2.2 : undefined },
           ]}
         />
         <Plot
@@ -337,6 +411,24 @@ export function App() {
         />
       </>
     );
+  }
+
+  // what this step is, in words
+  let stepText = "";
+  if (stepping && tab === "clamp") {
+    stepText = `Step ${k + 1} of ${nSteps}: ${fmt(clamp.hold)} → ${fmt(fam[k].v)} mV`;
+  } else if (stepping && ladder) {
+    const r = ladder.rungs[k];
+    const head = `Pulse ${k + 1} of ${nSteps}: ${fmt(r.amp)} µA/cm², ${r.fired ? "spike" : "no spike"}`;
+    const thr = ladder.thr === null ? "" : `Threshold is ${fmt(ladder.thr)} µA/cm².`;
+    const firstToFire = r.fired && (k === 0 || !ladder.rungs[k - 1].fired);
+    stepText =
+      r.role === "under" ? `${head}, 1% under threshold.`
+      : r.role === "over" ? `${head}, 1% over. ${thr}`
+      : r.role === "strong" ? `${head}, twice threshold: it fires sooner.`
+      : firstToFire ? `${head}: the first to fire. ${thr}`
+      : ladder.thr === null && k === 0 ? `${head}. No threshold: this cell fires with no pulse, or not at all.`
+      : `${head}.`;
   }
 
   // ------------------------------------------------------------ controls
@@ -442,6 +534,26 @@ export function App() {
           <Slider label="pulse length" unit="ms" value={stim.dur} min={0.05} max={50} log stock={DEFAULT_STIM.dur} onChange={(v) => setStim({ ...stim, dur: v })} />
           <Slider label="holding current" unit="µA/cm²" value={stim.hold} min={-20} max={20} step={0.1} stock={DEFAULT_STIM.hold} onChange={(v) => setStim({ ...stim, hold: v })} />
         </fieldset>
+        <fieldset className="group">
+          <legend className="formula">
+            Step through the action potential:{" "}
+            {ladderSpec
+              ? `${fmt(ladderSpec.count)} pulses, ${fmt(ladderSpec.first)} to ${fmt(ladderSpec.first + (ladderSpec.count - 1) * ladderSpec.by)} µA/cm²`
+              : "even steps up to threshold, then 1% under, 1% over, twice"}
+          </legend>
+          <div className="ladder-pick" role="radiogroup" aria-label="pulses to step through">
+            <button role="radio" aria-checked={!ladderSpec} className={!ladderSpec ? "on" : ""} onClick={() => setLadderSpec(null)}>Around threshold</button>
+            <button role="radio" aria-checked={!!ladderSpec} className={ladderSpec ? "on" : ""} onClick={() => !ladderSpec && autoSpec && setLadderSpec(autoSpec)}>My own</button>
+          </div>
+          {ladderSpec && autoSpec && (
+            <>
+              <Slider label="first pulse" unit="µA/cm²" value={ladderSpec.first} min={0} max={200} step={0.1} stock={autoSpec.first} onChange={(v) => setLadderSpec({ ...ladderSpec, first: v })} />
+              <Slider label="step size" unit="µA/cm²" value={ladderSpec.by} min={-50} max={50} step={0.1} stock={autoSpec.by} onChange={(v) => setLadderSpec({ ...ladderSpec, by: v })} />
+              <Slider label="pulses" value={ladderSpec.count} min={2} max={20} integer stock={autoSpec.count} onChange={(v) => setLadderSpec({ ...ladderSpec, count: v })} />
+            </>
+          )}
+          <p className="hint">Pulse length and holding current come from above. Turn on Step over the traces to walk through them.</p>
+        </fieldset>
       </>
     );
   }
@@ -451,7 +563,7 @@ export function App() {
     else if (sel === "na") setP({ ...p, gNa: STOCK.gNa, eNa: STOCK.eNa, pm: STOCK.pm, ph: STOCK.ph });
     else if (sel === "k") setP({ ...p, gK: STOCK.gK, eK: STOCK.eK, pn: STOCK.pn });
     else if (sel === "mem") setP({ ...p, celsius: STOCK.celsius, gL: STOCK.gL, eL: STOCK.eL, cm: STOCK.cm });
-    else { setClamp(DEFAULT_CLAMP); setStim(DEFAULT_STIM); }
+    else { setClamp(DEFAULT_CLAMP); setStim(DEFAULT_STIM); setLadderSpec(null); }
   };
 
   const chips: { id: Sel; label: string }[] = [
@@ -500,6 +612,7 @@ export function App() {
               <button className={tab === "clamp" ? "on" : ""} aria-label="Voltage clamp" onClick={() => setTab("clamp")}>{wide ? "Voltage clamp" : "Clamp"}</button>
               <button className={tab === "spike" ? "on" : ""} aria-label="Spike (action potential)" onClick={() => setTab("spike")}>{wide ? "Action potential" : "Spike"}</button>
             </span>
+            <button className={`step-btn${stepping ? " on" : ""}`} aria-pressed={stepping} aria-label="step through" onClick={toggleStepping}>Step</button>
             <span className="tabs small">
               {tab === "clamp"
                 ? (["iNa", "iK", "iv"] as const).map((k) => (
@@ -512,13 +625,23 @@ export function App() {
           </div>
           {(tab === "spike" || clampTrace !== "iv") && protocol}
           {simPlot}
-          <p className="caption">
-            {tab === "clamp" ? "Ideal clamp, no electrode: what no rig records." : "The membrane alone, no electrode."}
-            {(tab === "spike" || clampTrace !== "iv") && !zoomOn && (mouse ? " Drag across the traces or scroll to zoom time; double-click to reset." : " Pinch to zoom time, drag to pan, double-tap to reset.")}
-            {zoomOn && (
-              <button className="zoom-reset" onClick={() => (tab === "clamp" ? setClampX(null) : setSpikeX(null))}>Reset zoom</button>
-            )}
-          </p>
+          {stepping && (
+            <div className="stepper" role="group" aria-label="steps">
+              <button aria-label="previous step" disabled={k === 0} onClick={() => go(-1)}>‹</button>
+              <span className="step-text" aria-live="polite">{stepText}</span>
+              <button aria-label="next step" disabled={k === nSteps - 1} onClick={() => go(1)}>›</button>
+            </div>
+          )}
+          {(!stepping || zoomOn || mouse) && (
+            <p className="caption">
+              {!stepping && (tab === "clamp" ? "Ideal clamp, no electrode: what no rig records." : "The membrane alone, no electrode.")}
+              {!stepping && (tab === "spike" || clampTrace !== "iv") && !zoomOn && (mouse ? " Drag across the traces or scroll to zoom time; double-click to reset." : " Pinch to zoom time, drag to pan, double-tap to reset.")}
+              {stepping && mouse && !zoomOn && "The arrow keys, or a presentation clicker, step too."}
+              {zoomOn && (
+                <button className="zoom-reset" onClick={() => (tab === "clamp" ? setClampX(null) : setSpikeX(null))}>Reset zoom</button>
+              )}
+            </p>
+          )}
         </section>
       </main>
 
@@ -534,7 +657,7 @@ export function App() {
           {controls}
           <div className="resets">
             <button onClick={resetSel} disabled={!edited(sel)}>Reset {chips.find((c) => c.id === sel)!.label}</button>
-            <button onClick={() => { setP(stockParams()); setClamp(DEFAULT_CLAMP); setStim(DEFAULT_STIM); }} disabled={!anyEdited}>Reset all</button>
+            <button onClick={() => { setP(stockParams()); setClamp(DEFAULT_CLAMP); setStim(DEFAULT_STIM); setLadderSpec(null); }} disabled={!anyEdited}>Reset all</button>
           </div>
         </div>
       </aside>

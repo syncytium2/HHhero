@@ -3,7 +3,7 @@
 // Checks, at 360×740 with touch (the design) and then 1440×900 (the lecture screen):
 // no console errors, no request leaving the origin, no sideways scroll, the plots
 // and the controls on screen together, every button and slider at least 44 px on
-// the phone (the gate picker, log switch and trace tabs at least 36), and that both views and
+// the phone (the gate picker, log and Step switches and trace tabs at least 36), and that both views and
 // every chip render. Run it after any UI change.
 import { chromium } from "playwright-core";
 import { mkdirSync } from "node:fs";
@@ -49,7 +49,7 @@ const small = await phone.evaluate(() =>
     .filter((e) => e.offsetParent !== null)
     .map((e) => {
       const r = e.getBoundingClientRect();
-      const min = e.closest(".gate-pick, .tabs, .log-btn") ? 36 : 44;
+      const min = e.closest(".gate-pick, .tabs, .log-btn, .step-btn") ? 36 : 44;
       return { t: (e.getAttribute("aria-label") || e.textContent || e.className).trim().slice(0, 30), h: Math.round(r.height), w: Math.round(r.width), min };
     })
     .filter((x) => x.h < x.min || x.w < Math.min(x.min, 36)),
@@ -133,6 +133,52 @@ const vTicks = await lastTick('svg[aria-label="currents during the action potent
 if (!(vTicks < 40)) problems.push(`phone: pinching V did not zoom the currents below it (last tick ${vTicks})`);
 await phone.getByRole("button", { name: "Reset zoom" }).tap();
 for (const t of ["g", "m h n"]) { await phone.getByRole("button", { name: t, exact: true }).tap(); await phone.waitForTimeout(80); }
+// stepping through: one sweep at a time on the clamp, then the pulses up to threshold, then your own pulses
+const stepText = async (pg) => (await pg.locator(".step-text").textContent()) ?? "";
+await phone.getByRole("button", { name: "I", exact: true }).tap();
+await phone.getByRole("button", { name: "Voltage clamp" }).tap();
+await phone.getByRole("button", { name: "step through" }).tap();
+await phone.waitForTimeout(100);
+if (!(await stepText(phone)).startsWith("Step 1 of")) problems.push(`phone: stepping the clamp did not start at step 1 ("${await stepText(phone)}")`);
+await phone.getByRole("button", { name: "next step" }).tap();
+await phone.getByRole("button", { name: "next step" }).tap();
+await phone.waitForTimeout(100);
+if (!(await stepText(phone)).startsWith("Step 3 of")) problems.push(`phone: two taps forward did not reach step 3 ("${await stepText(phone)}")`);
+const visibleSweeps = await phone.locator('svg[aria-label="sodium current family"] path[d^="M"]').count();
+await phone.screenshot({ path: `${out}/phone-step-clamp.png` });
+await phone.getByRole("button", { name: "previous step" }).tap();
+await phone.waitForTimeout(80);
+if (!(await stepText(phone)).startsWith("Step 2 of")) problems.push("phone: back did not step back");
+if (!(visibleSweeps > 0)) problems.push("phone: stepping the clamp drew no sweeps");
+await noSideways(phone, "phone stepping");
+await phone.getByRole("button", { name: "Spike (action potential)" }).tap();
+await phone.waitForTimeout(200);
+if (!(await stepText(phone)).startsWith("Pulse 1 of")) problems.push(`phone: stepping the spike did not start at pulse 1 ("${await stepText(phone)}")`);
+let sawThreshold = false, sawSpike = false;
+for (let i = 0; i < 20; i++) {
+  const t = await stepText(phone);
+  if (t.includes("Threshold is")) sawThreshold = true;
+  if (/, spike/.test(t)) sawSpike = true;
+  if (await phone.getByRole("button", { name: "next step" }).isDisabled()) break;
+  await phone.getByRole("button", { name: "next step" }).tap();
+  await phone.waitForTimeout(60);
+  if (i === 5) await phone.screenshot({ path: `${out}/phone-step-spike-sub.png` });
+}
+if (!sawThreshold || !sawSpike) problems.push(`phone: stepping the pulses never crossed threshold (threshold ${sawThreshold}, spike ${sawSpike})`);
+await phone.screenshot({ path: `${out}/phone-step-spike-end.png` });
+await phone.locator(".chips").getByRole("tab", { name: "Protocol", exact: true }).tap();
+await phone.getByRole("radio", { name: "My own" }).tap();
+await phone.waitForTimeout(150);
+if (!(await phone.getByText("first pulse").count())) problems.push("phone: My own pulses shows no controls");
+await phone.getByRole("button", { name: "increase pulses" }).tap();
+await phone.waitForTimeout(150);
+if (!/of \d+/.test(await stepText(phone))) problems.push("phone: no step text with my own pulses");
+await phone.screenshot({ path: `${out}/phone-step-own.png` });
+await phone.getByRole("radio", { name: "Around threshold" }).tap();
+await phone.getByRole("button", { name: "step through" }).tap();
+await phone.waitForTimeout(80);
+if (await phone.locator(".stepper").count()) problems.push("phone: turning Step off left the stepper");
+
 await phone.getByRole("button", { name: "about" }).tap();
 await phone.waitForTimeout(100);
 await phone.screenshot({ path: `${out}/phone-about.png` });
@@ -164,6 +210,18 @@ if (!((await wTick()) < full0)) problems.push("wide: the wheel did not zoom");
 await wide.getByRole("button", { name: "Reset zoom" }).click();
 if (!(await wide.getByText("Drag across the traces").count())) problems.push("wide: no mouse zoom hint");
 await noSideways(wide, "wide");
+// the lecture screen: the arrow keys (and a clicker's Page Down) step
+await wide.getByRole("button", { name: "step through" }).click();
+await wide.keyboard.press("ArrowRight");
+await wide.keyboard.press("PageDown");
+await wide.waitForTimeout(100);
+if (!(await stepText(wide)).startsWith("Step 3 of")) problems.push(`wide: the keys did not step ("${await stepText(wide)}")`);
+await wide.screenshot({ path: `${out}/wide-step-clamp.png` });
+await wide.getByRole("button", { name: "I–V" }).click();
+await wide.waitForTimeout(100);
+await wide.screenshot({ path: `${out}/wide-step-iv.png` });
+await wide.getByRole("button", { name: "INa" }).click();
+await wide.getByRole("button", { name: "step through" }).click();
 await wide.getByRole("radio", { name: "x∞, τ" }).click();
 await wide.waitForTimeout(150);
 await wide.screenshot({ path: `${out}/wide-it.png` });

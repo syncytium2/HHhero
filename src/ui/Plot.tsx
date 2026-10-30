@@ -19,6 +19,8 @@ export interface Series {
   /** drawn at the line's right end, or at its largest excursion from zero */
   label?: string;
   labelAt?: "end" | "peak";
+  /** also mark each point */
+  dots?: boolean;
 }
 
 interface Props {
@@ -273,8 +275,13 @@ export function Plot({ height, series: raw, x: full, y, yInclude, xLabel, yLabel
               d += `${pen ? "L" : "M"}${sx(s.x[i]).toFixed(1)} ${clampY(sy(yv)).toFixed(1)}`;
               pen = true;
             }
+            const line = <path d={d} fill="none" style={{ stroke: s.color, strokeWidth: s.width ?? 1.6, strokeDasharray: s.dash, opacity: s.opacity ?? 1 }} strokeLinejoin="round" />;
+            if (!s.dots) return <g key={k}>{line}</g>;
             return (
-              <path key={k} d={d} fill="none" style={{ stroke: s.color, strokeWidth: s.width ?? 1.6, strokeDasharray: s.dash, opacity: s.opacity ?? 1 }} strokeLinejoin="round" />
+              <g key={k}>
+                {line}
+                {Array.from(s.x, (xv, i) => (Number.isFinite(s.y[i]) ? <circle key={i} cx={sx(xv)} cy={clampY(sy(s.y[i]))} r={3.5} style={{ fill: s.color, opacity: s.opacity ?? 1 }} /> : null))}
+              </g>
             );
           })}
         </g>

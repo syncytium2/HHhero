@@ -127,3 +127,28 @@ width and measured themselves after the first paint, so a drag started in
 that moment mapped to the wrong times; they now measure before painting. And
 the double-tap timer started at time zero, so a press within 300 ms of the
 page loading counted as a double-tap and reset the zoom.
+
+## 2026-10-30: stepping through, for teaching from the front
+
+The owner asked for "presentation mode where you can step through the
+protocol with fwd and back button. Similar for spike mode with small steps
+sub threshold to show threshold", then "need the protocol mode to be editable
+for spike mode". The Step switch over the traces shows one sweep at a time,
+with forward and back buttons; earlier sweeps stay faded and the axes stay
+where the whole family puts them, so nothing jumps. On the clamp it walks the
+voltage steps, and the I–V builds a point at a time. On the action potential
+it walks a ladder of pulse amplitudes. By default the ladder is built around
+this cell's own threshold, found by bisection: even, round steps below it,
+then 1% under and 1% over (all or none), then twice threshold (a shorter
+delay). The threshold is named only once a pulse crosses it. The Protocol
+panel can replace the ladder with your own: first pulse, step size, number of
+pulses. Arrow keys and Page Up/Down step too, which is what a presentation
+clicker sends.
+
+What counts as firing: a −20 mV crossing after the pulse starts, with the
+peak inward INa larger than the pulse. Without the second condition, a big
+enough pulse into a cell with no sodium conductance crosses −20 mV passively
+and would be called a spike. Code in `src/core/sim.ts` (`fires`,
+`pulseThreshold`, `thresholdLadder`, `evenLadder`); tests in
+`src/core/steps.test.ts`; the screenshot check steps both experiments, the
+custom ladder and the keys.
