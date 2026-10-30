@@ -17,7 +17,7 @@ import {
 } from "./core/rates.ts";
 import { buildModel, stockParams, type Model, type Params } from "./core/model.ts";
 import {
-  clampFamily, DEFAULT_CLAMP, DEFAULT_STIM, evenLadder, fires, freeRun, niceStep, pulseThreshold, settle, thresholdLadder,
+  clampFamily, DEFAULT_CLAMP, DEFAULT_STIM, evenLadder, fires, freeRun, niceStep, pulseThreshold, settle, testPotentials, thresholdLadder,
   type ClampProtocol, type Stimulus,
 } from "./core/sim.ts";
 import { noteFor, type View } from "./core/notes.ts";
@@ -524,8 +524,11 @@ export function App() {
     controls = (
       <>
         <fieldset className="group">
-          <legend className="formula">Voltage clamp: hold, then steps from {fmt(clamp.from)} to {fmt(clamp.to)} mV</legend>
+          <legend className="formula">Voltage clamp: hold, then {testPotentials(clamp).length} steps from {fmt(clamp.from)} to {fmt(clamp.to)} mV by {fmt(clamp.by)}</legend>
           <Slider label="holding potential" unit="mV" value={clamp.hold} min={-120} max={-30} step={1} stock={DEFAULT_CLAMP.hold} onChange={(v) => setClamp({ ...clamp, hold: v })} />
+          <Slider label="first step" unit="mV" value={clamp.from} min={-120} max={80} step={1} stock={DEFAULT_CLAMP.from} onChange={(v) => setClamp({ ...clamp, from: Math.min(v, clamp.to) })} />
+          <Slider label="last step" unit="mV" value={clamp.to} min={-120} max={80} step={1} stock={DEFAULT_CLAMP.to} onChange={(v) => setClamp({ ...clamp, to: Math.max(v, clamp.from) })} />
+          <Slider label="step spacing" unit="mV" value={clamp.by} min={1} max={50} step={1} stock={DEFAULT_CLAMP.by} onChange={(v) => setClamp({ ...clamp, by: Math.max(1, v) })} />
           <Slider label="step length" unit="ms" value={clamp.dur} min={2} max={50} step={1} stock={DEFAULT_CLAMP.dur} onChange={(v) => setClamp({ ...clamp, dur: v })} />
         </fieldset>
         <fieldset className="group">

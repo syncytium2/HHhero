@@ -152,3 +152,11 @@ and would be called a spike. Code in `src/core/sim.ts` (`fires`,
 `pulseThreshold`, `thresholdLadder`, `evenLadder`); tests in
 `src/core/steps.test.ts`; the screenshot check steps both experiments, the
 custom ladder and the keys.
+
+## 2026-10-30: the clamp family is editable
+
+Asked for right after stepping went live. Protocol now sets the first step,
+the last step and the step spacing as well as the hold and step length. The
+first step is kept at or below the last, so the family always has at least
+one sweep. The clamp slider is called "step spacing" so that it differs from
+the "step size" of your own pulse ladder.

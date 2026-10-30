@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildModel, stockParams } from "./model.ts";
-import { DEFAULT_STIM, fires, niceStep, pulseThreshold, settle, thresholdLadder } from "./sim.ts";
+import { DEFAULT_CLAMP, DEFAULT_STIM, fires, testPotentials, niceStep, pulseThreshold, settle, thresholdLadder } from "./sim.ts";
 
 const DT = 0.01;
 const md = buildModel(stockParams());
@@ -40,5 +40,13 @@ describe("stepping up to threshold", () => {
     expect(niceStep(2.2)).toBe(2);
     expect(niceStep(3)).toBe(2.5);
     expect(niceStep(97)).toBe(50);
+  });
+});
+
+describe("an edited clamp family", () => {
+  it("runs from the first step to the last, by the step size, and is never empty", () => {
+    expect(testPotentials({ ...DEFAULT_CLAMP, from: -80, to: -20, by: 20 })).toEqual([-80, -60, -40, -20]);
+    expect(testPotentials({ ...DEFAULT_CLAMP, from: -30, to: -30, by: 10 })).toEqual([-30]);
+    expect(testPotentials({ ...DEFAULT_CLAMP, from: -60, to: 0, by: 25 })).toEqual([-60, -35, -10]);
   });
 });

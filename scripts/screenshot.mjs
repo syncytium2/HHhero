@@ -167,6 +167,11 @@ for (let i = 0; i < 20; i++) {
 if (!sawThreshold || !sawSpike) problems.push(`phone: stepping the pulses never crossed threshold (threshold ${sawThreshold}, spike ${sawSpike})`);
 await phone.screenshot({ path: `${out}/phone-step-spike-end.png` });
 await phone.locator(".chips").getByRole("tab", { name: "Protocol", exact: true }).tap();
+// the clamp family is editable: one more step size shortens the family
+await phone.getByRole("button", { name: "increase step spacing" }).tap();
+await phone.waitForTimeout(100);
+if (!(await phone.getByText(/10 steps from −55 to 45 mV by 11/).count())) problems.push("phone: the clamp step spacing did not change the family");
+await phone.getByRole("button", { name: "decrease step spacing" }).tap();
 await phone.getByRole("radio", { name: "My own" }).tap();
 await phone.waitForTimeout(150);
 if (!(await phone.getByText("first pulse").count())) problems.push("phone: My own pulses shows no controls");
