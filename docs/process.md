@@ -229,3 +229,32 @@ the point is to move one and watch. Off by default; remembered per device in
 localStorage (`hhhero.focus`), so students see what they saw before, and an
 instructor's laptop stays as it was left. Collapsing the simulation card
 instead, to make the curves big, is not built; it would be the same mechanism.
+
+## 2026-10-31: the tour, g in voltage clamp, and the link home
+
+The owner asked for a quick tour that demos every feature, then: "Make it so
+it adapts to new features automatically." So the tour has no list of
+features. Each control carries a caption (`tour()` in `src/ui/Tour.tsx`)
+beside its own code, and the tour walks whatever captioned elements are on
+screen, in page order, acting by kind: a toggle is pressed and released, a
+choice (radio, tab) is made and, at the end, put back, a slider gets five +
+and five −. Choices wait until everything else on screen has been seen, so
+choosing Action potential brings its own controls into the tour. The
+screenshot check runs the whole tour and checks everything is back as it
+was, and fails on any visible button without a caption: that is what keeps
+"automatically" true. One bug found that way: five − presses in one instant
+read the same starting value and moved the slider once, so the presses are
+spaced.
+
+Asked for "an I / g toggle for clamp mode", and to label the clamp tab
+"V clamp" (Spike stays: more salient than "I clamp" before students know
+voltage from current clamp). g swaps currents for conductances on the traces
+and the I–V, which becomes a g–V (peak gNa, gK at the end of the step). To
+keep a phone's header on one row, INa and IK became Na and K (they now
+choose a channel, current or conductance), and the row's buttons tightened;
+the screenshot check now fails if that header wraps.
+
+The required link back to tonydefazio.com, without the usual arrow (the
+owner finds it confusing) and without using vertical space: small, under
+the HHhero name in the header, which is already as tall as its buttons; and
+in About, "By Tony DeFazio".

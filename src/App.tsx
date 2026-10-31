@@ -10,6 +10,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Plot, type Series } from "./ui/Plot.tsx";
 import { Slider } from "./ui/Slider.tsx";
+import { Tour, tour } from "./ui/Tour.tsx";
 import { clampView, isFull, type Range } from "./ui/zoom.ts";
 import {
   fmt, GATE_IDS, infEdited, NO_EDIT, rateEdited, rateFormula, STOCK_RATES, stockGate, tauEdited,
@@ -18,7 +19,7 @@ import {
 import { buildModel, stockParams, type Model, type Params } from "./core/model.ts";
 import {
   clampFamily, DEFAULT_CLAMP, DEFAULT_STIM, evenLadder, fires, freeRun, niceStep, pulseThreshold, settle, testPotentials, thresholdLadder,
-  type ClampProtocol, type Stimulus,
+  type ClampProtocol, type ClampSweep, type Stimulus,
 } from "./core/sim.ts";
 import { noteFor, type View } from "./core/notes.ts";
 import { ARCHIVED, BORN, EARLIER, VERSION } from "./version.ts";
@@ -114,6 +115,8 @@ export function App() {
   const [tab, setTab] = useState<SimTab>("clamp");
   // the currents drawn in voltage clamp, either or both, on the traces and on the I–V; and whether the I–V replaces the traces
   const [clampCur, setClampCur] = useState<Cur[]>(["iNa"]);
+  // the clamp shows currents or, with g on, the conductances behind them
+  const [clampG, setClampG] = useState(false);
   const [iv, setIv] = useState(false);
   // the measuring cursor on the traces: off until asked for; a time per experiment, and the clamp sweep it reads
   const [measure, setMeasure] = useState(false);
@@ -125,6 +128,7 @@ export function App() {
   const [stim, setStim] = useState<Stimulus>(DEFAULT_STIM);
   const [cursor, setCursor] = useState(-40);
   const [about, setAbout] = useState(false);
+  const [touring, setTouring] = useState(false);
   // focus: the curves card hides and the traces take its height, for teaching from the front of a room; remembered per device
   const [focus, setFocus] = useState(() => { try { return localStorage.getItem("hhhero.focus") === "1"; } catch { return false; } });
   const toggleFocus = () => {
@@ -322,6 +326,10 @@ export function App() {
 
   // ------------------------------------------------------------ simulation
   const mA = (a: Float64Array) => a.map((x) => x / 1000);
+  // what the clamp draws for a channel: its current in mA/cm², or its conductance in mS/cm²
+  const cq = (s: ClampSweep, c: Cur) => (clampG ? (c === "iNa" ? s.gNa : s.gK) : mA(s[c]));
+  const cqLabel = (c: Cur) => (clampG ? (c === "iNa" ? "gNa" : "gK") : CUR_LABEL[c]);
+  const cqUnit = clampG ? "mS/cm²" : "mA/cm²";
   const n = fam.length;
   const shade = (j: number) => 0.35 + (0.65 * j) / Math.max(1, n - 1);
   // stepping: the sweeps so far, earlier ones faded, this one bold; the axes stay where the whole family puts them
@@ -360,7 +368,7 @@ export function App() {
     let best = -1, bd = Infinity;
     for (let j = 0; j < (stepping ? k + 1 : n); j++)
       for (const c of clampCur) {
-        const d = Math.abs(valAt(fam[j].t, fam[j][c], t) / 1000 - y);
+        const d = Math.abs(valAt(fam[j].t, cq(fam[j], c), t) - y);
         if (d < bd) { bd = d; best = j; }
       }
     if (best >= 0 && !stepping) setClampPick(best);
@@ -418,24 +426,27 @@ export function App() {
     if (iv) {
       // stepping builds the curve a point at a time, on the axes the whole family needs
       const vs = upTo(fam.map((s) => s.v));
-      const pk = (f: typeof fam, which: "iNaPeak" | "iKEnd") => upTo(f.map((s) => s[which] / 1000));
+      // peak INa and IK at the end of the step; or peak gNa and gK at the end
+      const ivOf = (s: ClampSweep, which: "iNaPeak" | "iKEnd") =>
+        !clampG ? s[which] / 1000 : which === "iNaPeak" ? Math.max(...s.gNa) : s.gK[s.gK.length - 1];
+      const pk = (f: typeof fam, which: "iNaPeak" | "iKEnd") => upTo(f.map((s) => ivOf(s, which)));
       simPlot = (
         <Plot
           height={H.sim}
-          ariaLabel="current-voltage relation"
+          ariaLabel={clampG ? "conductance-voltage relation" : "current-voltage relation"}
           x={[clamp.from - 5, clamp.to + 5]}
           zeroLine
           yInclude={extent([fam, famStock].flatMap((f) => [
-            ...(clampCur.includes("iNa") ? [f.map((s) => s.iNaPeak / 1000)] : []),
-            ...(clampCur.includes("iK") ? [f.map((s) => s.iKEnd / 1000)] : []),
+            ...(clampCur.includes("iNa") ? [f.map((s) => ivOf(s, "iNaPeak"))] : []),
+            ...(clampCur.includes("iK") ? [f.map((s) => ivOf(s, "iKEnd"))] : []),
           ]))}
           xLabel="test potential (mV)"
-          yLabel="I (mA/cm²)"
+          yLabel={clampG ? "g (mS/cm²)" : "I (mA/cm²)"}
           series={[
             ...(clampCur.includes("iNa") ? [{ x: vs, y: pk(famStock, "iNaPeak"), color: C.stock, width: 3 }] : []),
             ...(clampCur.includes("iK") ? [{ x: vs, y: pk(famStock, "iKEnd"), color: C.stock, width: 3, dash: "5 4" }] : []),
-            ...(clampCur.includes("iNa") ? [{ x: vs, y: pk(fam, "iNaPeak"), color: C.na, label: "INa peak", dots: stepping }] : []),
-            ...(clampCur.includes("iK") ? [{ x: vs, y: pk(fam, "iKEnd"), color: C.k, dash: "5 4", label: "IK end", dots: stepping }] : []),
+            ...(clampCur.includes("iNa") ? [{ x: vs, y: pk(fam, "iNaPeak"), color: C.na, label: `${cqLabel("iNa")} peak`, dots: stepping }] : []),
+            ...(clampCur.includes("iK") ? [{ x: vs, y: pk(fam, "iKEnd"), color: C.k, dash: "5 4", label: `${cqLabel("iK")} end`, dots: stepping }] : []),
           ]}
         />
       );
@@ -446,22 +457,22 @@ export function App() {
       simPlot = (
         <Plot
           height={H.sim}
-          ariaLabel={both ? "sodium and potassium current families" : clampCur[0] === "iNa" ? "sodium current family" : "potassium current family"}
+          ariaLabel={`${both ? "sodium and potassium" : clampCur[0] === "iNa" ? "sodium" : "potassium"} ${clampG ? "conductance" : "current"} famil${both ? "ies" : "y"}`}
           x={clampFull}
           zoom={clampZoom}
           {...clampCursor}
           onCursor={measure ? onClampTraces : undefined}
           zeroLine
-          yInclude={stepping ? extent([...fam, ...famStock].flatMap((s) => clampCur.map((c) => mA(s[c])))) : [0]}
+          yInclude={stepping ? extent([...fam, ...famStock].flatMap((s) => clampCur.map((c) => cq(s, c)))) : [0]}
           xLabel="ms"
-          yLabel={`${clampCur.map((c) => CUR_LABEL[c]).join(", ")} (mA/cm²)`}
+          yLabel={`${clampCur.map(cqLabel).join(", ")} (${cqUnit})`}
           series={clampCur.flatMap((c) => [
-            ...(stepping ? [famStock[k]] : famStock).map((s) => ({ x: s.t, y: mA(s[c]), color: C.stock, width: 2.5 }) as Series),
+            ...(stepping ? [famStock[k]] : famStock).map((s) => ({ x: s.t, y: cq(s, c), color: C.stock, width: 2.5 }) as Series),
             ...upTo(fam).map((s, j) => ({
-              x: s.t, y: mA(s[c]), color: c === "iNa" ? C.na : C.k,
+              x: s.t, y: cq(s, c), color: c === "iNa" ? C.na : C.k,
               width: bold(j) ?? (measure && clampT !== null && j === mi ? 2.2 : 1.4),
               opacity: measure && clampT !== null && j === mi ? 1 : fade(j),
-              label: labelled(j) ? CUR_LABEL[c] : undefined, labelAt: "peak",
+              label: labelled(j) ? cqLabel(c) : undefined, labelAt: "peak",
             }) as Series),
           ])}
         />
@@ -525,8 +536,8 @@ export function App() {
     if (clampT === null) reading = mouse ? "Click a trace to measure it; drag the line to move." : "Tap a trace to measure it; drag the line to move.";
     else {
       const sw = fam[mi], t = clampT;
-      const cur = (["iNa", "iK"] as Cur[]).map((c) => `${CUR_LABEL[c]} ${fmt(valAt(sw.t, sw[c], t) / 1000)}`).join(", ");
-      reading = `t ${fmt(t)} ms · ${t > clamp.pre ? `step to ${fmt(sw.v)}` : `hold ${fmt(clamp.hold)}`} mV · ${cur} mA/cm²`;
+      const cur = (["iNa", "iK"] as Cur[]).map((c) => `${cqLabel(c)} ${fmt(valAt(sw.t, cq(sw, c), t))}`).join(", ");
+      reading = `t ${fmt(t)} ms · ${t > clamp.pre ? `step to ${fmt(sw.v)}` : `hold ${fmt(clamp.hold)}`} mV · ${cur} ${cqUnit}`;
     }
   } else if (measure && tab === "spike") {
     if (spikeT === null) reading = mouse ? "Click the traces to measure; drag the line to move." : "Tap the traces to measure; drag the line to move.";
@@ -709,12 +720,19 @@ export function App() {
   return (
     <div className={`app${wide ? " wide" : ""}`}>
       <header className="top">
-        <h1>HH<span>hero</span></h1>
-        <div className="switch" role="radiogroup" aria-label="formulation">
-          <button role="radio" aria-checked={view === "ab"} className={view === "ab" ? "on" : ""} onClick={() => setView("ab")}>α, β</button>
-          <button role="radio" aria-checked={view === "it"} className={view === "it" ? "on" : ""} onClick={() => setView("it")}>x∞, τ</button>
+        <div className="brand">
+          <h1>HH<span>hero</span></h1>
+          <a className="home-link" href="https://tonydefazio.com/">tonydefazio.com</a>
         </div>
-        <button className="about-btn" aria-label="about" onClick={() => setAbout(true)}>?</button>
+        <button className="tour-btn" aria-label="quick tour" onClick={() => setTouring(true)} disabled={touring}>Tour</button>
+        <div className="switch" role="radiogroup" aria-label="formulation">
+          <button role="radio" aria-checked={view === "ab"} className={view === "ab" ? "on" : ""} onClick={() => setView("ab")}
+            {...tour("α, β", "Each gate as Hodgkin and Huxley wrote it: α, how fast it opens, and β, how fast it closes.")}>α, β</button>
+          <button role="radio" aria-checked={view === "it"} className={view === "it" ? "on" : ""} onClick={() => setView("it")}
+            {...tour("x∞, τ", "The same gates as where they settle and how fast they get there. The model doesn't change; what you hold does.")}>x∞, τ</button>
+        </div>
+        <button className="about-btn" aria-label="about" onClick={() => setAbout(true)}
+          {...tour("About", "The model, its source, and the earlier versions, if something stops working.")}>?</button>
       </header>
 
       {ARCHIVED && (
@@ -725,7 +743,7 @@ export function App() {
       <main className="plots">
         {!focus && <section className="card curves" aria-label="gate curves">
           <div className="card-head">
-            <span className="gate-pick">
+            <span className="gate-pick" {...tour("The gates", "Draw m, h and n, any of them together. Gray is the stock squid axon; color is your cell.")}>
               {GATE_IDS.map((id) => (
                 <button
                   key={id}
@@ -739,7 +757,8 @@ export function App() {
                 </button>
               ))}
             </span>
-            <button className={`log-btn${logY ? " on" : ""}`} aria-pressed={logY} aria-label="log scale" onClick={() => setLogY(!logY)}>log</button>
+            <button className={`log-btn${logY ? " on" : ""}`} aria-pressed={logY} aria-label="log scale" onClick={() => setLogY(!logY)}
+              {...tour("log", "A log axis, to see the small rates.")}>log</button>
             <span className="muted">{fmt(p.celsius)} °C · gray = stock</span>
           </div>
           {curvePlots}
@@ -749,10 +768,13 @@ export function App() {
         <section className="card sim" aria-label="simulation">
           <div className="card-head">
             <span className="tabs">
-              <button className={tab === "clamp" ? "on" : ""} aria-label="Voltage clamp" onClick={() => setTab("clamp")}>{wide ? "Voltage clamp" : "Clamp"}</button>
-              <button className={tab === "spike" ? "on" : ""} aria-label="Spike (action potential)" onClick={() => setTab("spike")}>{wide ? "Action potential" : "Spike"}</button>
+              <button className={tab === "clamp" ? "on" : ""} aria-label="Voltage clamp" onClick={() => setTab("clamp")}
+                {...tour("Voltage clamp", "Hold the membrane at a family of voltages and record the currents that flow.", { kind: "pick" })}>{wide ? "Voltage clamp" : "V clamp"}</button>
+              <button className={tab === "spike" ? "on" : ""} aria-label="Spike (action potential)" onClick={() => setTab("spike")}
+                {...tour("Action potential", "Inject a brief pulse of current and let the cell fire.", { kind: "pick" })}>{wide ? "Action potential" : "Spike"}</button>
             </span>
-            <button className={`step-btn${stepping ? " on" : ""}`} aria-pressed={stepping} aria-label="step through" onClick={toggleStepping}>Step</button>
+            <button className={`step-btn${stepping ? " on" : ""}`} aria-pressed={stepping} aria-label="step through" onClick={toggleStepping}
+              {...tour("Step", "One sweep at a time, for teaching from the front of a room: the clamp family, or pulses up to threshold and across it. The arrow keys and a presentation clicker step too.", { then: "next step" })}>Step</button>
             <span className="tabs small">
               {tab === "clamp"
                 ? (
@@ -760,21 +782,26 @@ export function App() {
                       {(["iNa", "iK"] as const).map((c) => {
                         const on = clampCur.includes(c), col = c === "iNa" ? C.na : C.k;
                         return (
-                          <button key={c} aria-pressed={on} className={on ? "on" : ""} style={on ? { background: col, borderColor: col } : { color: col }} onClick={() => toggleCur(c)}>{CUR_LABEL[c]}</button>
+                          <button key={c} aria-pressed={on} className={on ? "on" : ""} style={on ? { background: col, borderColor: col } : { color: col }} aria-label={c === "iNa" ? "sodium" : "potassium"} onClick={() => toggleCur(c)}
+                            {...tour(c === "iNa" ? "Na" : "K", c === "iNa" ? "Sodium. Na and K switch on and off separately, on the traces and on the I–V." : "Potassium, alone or with sodium.")}>{c === "iNa" ? "Na" : "K"}</button>
                         );
                       })}
-                      <button className={`iv-btn${iv ? " on" : ""}`} aria-pressed={iv} onClick={() => setIv(!iv)}>I–V</button>
+                      <button className={clampG ? "on" : ""} aria-pressed={clampG} aria-label="conductance" onClick={() => setClampG(!clampG)}
+                        {...tour("g", "Conductance instead of current: what the channels do, without the driving force.")}>g</button>
+                      <button className={`iv-btn${iv ? " on" : ""}`} aria-pressed={iv} onClick={() => setIv(!iv)}
+                        {...tour("I–V", "Peak sodium and late potassium against the step voltage.")}>{clampG ? "g–V" : "I–V"}</button>
                     </>
                   )
                 : (["i", "g", "gates"] as const).map((k) => (
-                    <button key={k} className={spikeTrace === k ? "on" : ""} onClick={() => setSpikeTrace(k)}>{k === "i" ? "I" : k === "g" ? "g" : "m h n"}</button>
+                    <button key={k} className={spikeTrace === k ? "on" : ""} onClick={() => setSpikeTrace(k)}
+                    {...tour(k === "i" ? "I" : k === "g" ? "g" : "m h n", k === "i" ? "The currents during the spike." : k === "g" ? "The conductances during the spike." : "The gates during the spike.", { kind: "pick" })}>{k === "i" ? "I" : k === "g" ? "g" : "m h n"}</button>
                   ))}
             </span>
           </div>
           {(tab === "spike" || !iv) && protocol}
-          {simPlot}
+          <div className="sim-plots" {...tour("The traces", "Pinch or drag across them to zoom time; double-tap or double-click resets.")}>{simPlot}</div>
           {stepping && (
-            <div className="stepper" role="group" aria-label="steps">
+            <div className="stepper" role="group" aria-label="steps" {...tour("Stepping", "Back and forward through the sweeps.")}>
               <button aria-label="previous step" disabled={k === 0} onClick={() => go(-1)}>‹</button>
               <span className="step-text" aria-live="polite">
                 {stepText}
@@ -794,33 +821,36 @@ export function App() {
               )}
             </span>
             {zoomOn && (
-              <button className="zoom-reset" onClick={() => (tab === "clamp" ? setClampX(null) : setSpikeX(null))}>Reset zoom</button>
+              <button className="zoom-reset" {...tour("Reset zoom", "Back to the whole sweep.")} onClick={() => (tab === "clamp" ? setClampX(null) : setSpikeX(null))}>Reset zoom</button>
             )}
             {(tab === "spike" || !iv) && (
-              <button className={`measure-btn${measure ? " on" : ""}`} aria-pressed={measure} aria-label="measuring cursor" onClick={toggleMeasure}>Cursor</button>
+              <button className={`measure-btn${measure ? " on" : ""}`} aria-pressed={measure} aria-label="measuring cursor" onClick={toggleMeasure}
+                {...tour("Cursor", "Tap a trace to read time, voltage and currents; drag the line to move it. Zoom still works.")}>Cursor</button>
             )}
-            <button className={`measure-btn${focus ? " on" : ""}`} aria-pressed={focus} aria-label="focus on the traces" onClick={toggleFocus}>Focus</button>
+            <button className={`measure-btn${focus ? " on" : ""}`} aria-pressed={focus} aria-label="focus on the traces" onClick={toggleFocus}
+              {...tour("Focus", "Hide the curves and give the traces the screen, for a projector.")}>Focus</button>
           </div>
         </section>
       </main>
 
       <aside className="controls" aria-label="parameters">
-        <div className="chips" role="tablist">
+        <div className="chips" role="tablist" {...tour("What to edit", "A gate, the sodium or potassium channel, the membrane, or the protocol. A dot marks what you have changed.")}>
           {chips.map((c) => (
             <button key={c.id} role="tab" aria-selected={sel === c.id} className={`chip${sel === c.id ? " on" : ""}${edited(c.id) ? " dirty" : ""}`} onClick={() => pick(c.id)}>
               {c.label}
             </button>
           ))}
         </div>
-        <div className="panel" ref={panelRef}>
+        <div className="panel" ref={panelRef} {...tour("Sliders", "Drag, or tap − and +. Everything above follows at once; gray marks the stock value.", { kind: "slider" })}>
           {controls}
-          <div className="resets">
+          <div className="resets" {...tour("Reset", "Put one thing back, or everything.")}>
             <button onClick={resetSel} disabled={!edited(sel)}>Reset {chips.find((c) => c.id === sel)!.label}</button>
             <button onClick={() => { setP(stockParams()); setClamp(DEFAULT_CLAMP); setStim(DEFAULT_STIM); setLadderSpec(null); }} disabled={!anyEdited}>Reset all</button>
           </div>
         </div>
       </aside>
 
+      {touring && <Tour onEnd={() => setTouring(false)} />}
       {about && (
         <div className="about" role="dialog" aria-modal="true" aria-label="about HHhero" onClick={() => setAbout(false)}>
           <div className="about-card" onClick={(e) => e.stopPropagation()}>
@@ -867,6 +897,7 @@ export function App() {
               <a href="https://github.com/syncytium2/HHhero">source</a> · from{" "}
               <a href="https://gaba.tonydefazio.com">gaba_excites</a>
             </p>
+            <p className="muted">By <a href="https://tonydefazio.com/">Tony DeFazio</a>, tonydefazio.com</p>
             <button onClick={() => setAbout(false)}>Close</button>
           </div>
         </div>

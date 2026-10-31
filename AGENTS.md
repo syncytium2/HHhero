@@ -28,6 +28,12 @@ between the two. One model, two sets of controls. The core is `src/core/`
 
 ## Rules that are load-bearing
 
+- **Every control gets a tour caption.** The Tour (`src/ui/Tour.tsx`) knows
+  no features: it walks whatever carries `{...tour(title, text)}` in page
+  order and shows each working (toggles pressed and released, picks chosen
+  then restored, a slider nudged). A new button joins the tour by getting a
+  caption; the screenshot check fails on a visible button without one.
+
 - **The switch never changes the model.** Each view keeps its own edits,
   applied in a fixed order (α/β constants, then the conversion, then the x∞/τ
   edits). At no edit both views are the stock model to the bit. A view's edits

@@ -56,6 +56,45 @@ const small = await phone.evaluate(() =>
 );
 for (const s of small) problems.push(`phone: touch target too small: "${s.t}" ${s.w}×${s.h} (min ${s.min})`);
 
+// the tour knows no features: every control on screen must carry a caption (tour() in App.tsx), or the tour misses it
+const untoured = async (pg, where) => {
+  const bare = await pg.evaluate(() =>
+    [...document.querySelectorAll(".app button")]
+      .filter((e) => e.offsetParent !== null && !e.closest(".tour-btn, .tour-card, [role=dialog]") && !e.closest("[data-tour]"))
+      .map((e) => (e.getAttribute("aria-label") || e.textContent || "").trim()),
+  );
+  for (const b of bare) problems.push(`${where}: "${b}" has no tour caption: give it tour() in App.tsx`);
+};
+await untoured(phone, "phone");
+// the whole tour, a stop at a time; afterwards everything is as it was
+const isPressed = (pg, name) => pg.getByRole("button", { name, exact: true }).getAttribute("aria-pressed");
+const sliderBefore = await phone.locator(".panel input[type=range]").first().inputValue();
+await phone.getByRole("button", { name: "quick tour" }).tap();
+await phone.locator(".tour-card").waitFor();
+const seen = [];
+for (let i = 0; i < 60 && (await phone.locator(".tour-card").count()); i++) {
+  seen.push((await phone.locator(".tour-title").textContent()).replace(/^\d+\. /, ""));
+  await phone.waitForTimeout(i < 25 ? 1400 : 300);
+  if (i === 4 || seen.at(-1) === "Step") await phone.screenshot({ path: `${out}/phone-tour-${i}.png` });
+  if (await phone.locator(".tour-card").count()) await phone.getByRole("button", { name: "Next", exact: true }).tap();
+}
+await phone.waitForTimeout(600);
+if (await phone.locator(".tour-card").count()) problems.push("phone: the tour never ended");
+for (const t of ["α, β", "x∞, τ", "Voltage clamp", "Action potential", "Step", "K", "I–V", "g", "Cursor", "Focus", "Sliders", "m h n"])
+  if (!seen.includes(t)) problems.push(`phone: the tour skipped "${t}" (saw ${seen.join(" / ")})`);
+if (!(await phone.locator(".curves").count())) problems.push("phone: after the tour, Focus is still on");
+if ((await phone.getByRole("radio", { name: "α, β" }).getAttribute("aria-checked")) !== "true") problems.push("phone: after the tour, the view is not back to α, β");
+if (!(await phone.locator('svg[aria-label="sodium current family"]').count())) problems.push("phone: after the tour, the clamp INa family is not back");
+for (const b of ["potassium", "I–V", "conductance"]) if ((await isPressed(phone, b)) !== "false") problems.push(`phone: after the tour, ${b} is still on`);
+if ((await isPressed(phone, "measuring cursor")) !== "false") problems.push("phone: after the tour, the cursor is still on");
+if (await phone.locator(".stepper").count()) problems.push("phone: after the tour, Step is still on");
+if ((await phone.locator(".panel input[type=range]").first().inputValue()) !== sliderBefore) problems.push("phone: after the tour, the slider moved");
+await phone.getByRole("button", { name: "Spike (action potential)" }).tap();
+await phone.waitForTimeout(100);
+if ((await phone.getByRole("button", { name: "I", exact: true }).getAttribute("class"))?.includes("on") !== true) problems.push("phone: after the tour, the spike traces are not back to I");
+await untoured(phone, "phone spike");
+await phone.getByRole("button", { name: "Voltage clamp" }).tap();
+
 // m, h and n together: the curve card's buttons toggle, they do not switch
 await phone.getByRole("button", { name: "show h" }).tap();
 await phone.getByRole("button", { name: "show n" }).tap();
@@ -142,6 +181,14 @@ await phone.getByRole("button", { name: "Action potential" }).tap();
 await phone.waitForTimeout(200);
 await phone.screenshot({ path: `${out}/phone-spike.png` });
 if (!(await phone.locator('svg[aria-label="current pulse protocol"]').count())) problems.push("phone: no protocol strip on the action potential");
+// the simulation header is one row on a phone, in both experiments
+const headRows = async () => phone.evaluate(() => { const h = document.querySelector(".sim .card-head"); const tops = new Set([...h.querySelectorAll("button")].map((b) => Math.round(b.getBoundingClientRect().top))); return tops.size; });
+if ((await headRows()) !== 1) problems.push("phone: the action potential header wraps");
+await phone.getByRole("button", { name: "Voltage clamp" }).tap();
+await phone.waitForTimeout(100);
+if ((await headRows()) !== 1) problems.push("phone: the voltage clamp header wraps");
+await phone.getByRole("button", { name: "Spike (action potential)" }).tap();
+await phone.waitForTimeout(100);
 await pinch('svg[aria-label="membrane potential"]');
 await phone.screenshot({ path: `${out}/phone-spike-zoomed.png` });
 const vTicks = await lastTick('svg[aria-label="currents during the action potential"]');
@@ -285,11 +332,21 @@ await wide.screenshot({ path: `${out}/wide-step-iv.png` });
 await wide.getByRole("button", { name: "I–V" }).click();
 await wide.getByRole("button", { name: "step through" }).click();
 // INa and IK toggle, together on one plot
-await wide.getByRole("button", { name: "IK", exact: true }).click();
+await wide.getByRole("button", { name: "potassium", exact: true }).click();
 await wide.waitForTimeout(100);
 if (!(await wide.locator('svg[aria-label="sodium and potassium current families"]').count())) problems.push("wide: INa and IK together did not draw both families");
 await wide.screenshot({ path: `${out}/wide-both.png` });
-await wide.getByRole("button", { name: "IK", exact: true }).click();
+await wide.getByRole("button", { name: "potassium", exact: true }).click();
+// g: the clamp shows conductances instead of currents
+await wide.getByRole("button", { name: "conductance", exact: true }).click();
+await wide.waitForTimeout(100);
+if (!(await wide.locator('svg[aria-label="sodium conductance family"]').count())) problems.push("wide: g did not draw the sodium conductance family");
+await wide.getByRole("button", { name: "g–V" }).click();
+await wide.waitForTimeout(100);
+if (!(await wide.locator('svg[aria-label="conductance-voltage relation"]').count())) problems.push("wide: g with I–V did not draw the g–V");
+await wide.screenshot({ path: `${out}/wide-gv.png` });
+await wide.getByRole("button", { name: "g–V" }).click();
+await wide.getByRole("button", { name: "conductance", exact: true }).click();
 // the mouse cursor: a click measures, dragging the line moves it, and a drag elsewhere still zooms
 const reading = async () => (await wide.locator(".reading").count()) ? await wide.locator(".reading").textContent() : "";
 await wide.getByRole("button", { name: "measuring cursor" }).click();

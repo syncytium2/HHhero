@@ -127,3 +127,26 @@ a { color: inherit; }
 .app.wide .controls { margin-top: 0; border-top: 0; border-left: 1px solid var(--line); }
 .app.wide .card-head { font-size: 14px; }
 .app.wide .readout { font-size: 14px; }
+
+/* the brand, with the link home tucked under it so the header stays one row */
+.brand { display: flex; flex-direction: column; line-height: 1.15; min-width: 0; }
+.home-link { font-size: 11px; color: var(--muted); text-decoration: none; padding: 2px 0; }
+.home-link:hover, .home-link:focus-visible { text-decoration: underline; color: var(--ink); }
+.tour-btn { min-height: 44px; min-width: 44px; padding: 0 8px; font-size: 14px; }
+.app:not(.wide) .top { gap: 6px; padding: 6px 8px; }
+.app:not(.wide) .switch button { min-width: 64px; }
+
+/* the tour: a ring around what it shows, and a card away from it */
+.tour-ring { position: fixed; z-index: 60; pointer-events: none; border: 3px solid var(--na); border-radius: 10px; box-shadow: 0 0 0 4px color-mix(in srgb, var(--na) 25%, transparent); transition: all 0.25s ease; }
+.tour-card { position: fixed; z-index: 61; left: 8px; right: 8px; margin: 0 auto; max-width: 520px; background: var(--card); color: var(--ink); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.25); }
+.tour-card.at-bottom { bottom: 8px; }
+.tour-card.at-top { top: 8px; }
+.tour-title { font-weight: 700; font-size: 15px; }
+.tour-text { font-size: 14px; margin: 4px 0 8px; line-height: 1.35; }
+.tour-buttons { display: flex; gap: 6px; }
+.tour-buttons button { flex: 1; min-height: 44px; }
+/* a phone's simulation header holds the tabs and up to four trace buttons on one row */
+.app:not(.wide) .sim .card-head { gap: 4px; }
+.app:not(.wide) .sim .tabs.small button { min-width: 36px; padding: 0 6px; }
+.app:not(.wide) .sim .tabs button { padding: 0 6px; }
+.app:not(.wide) .iv-btn { margin-left: 2px; }

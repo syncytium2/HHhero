@@ -25,6 +25,10 @@ and across threshold (your own ladder, if you set one in Protocol). The arrow
 keys and a presentation clicker step too. Focus, under the traces, hides the
 gate curves and gives the traces the screen; the device remembers it.
 
+New to it? Tour, at the top, walks every control and shows it working, then
+puts everything back. In voltage clamp, Na and K switch each channel on and
+off, g shows conductance instead of current, and I–V (g–V) plots the peaks.
+
 ## The model
 
 The space-clamped squid axon of Hodgkin & Huxley (1952) J Physiol 117:500–544
