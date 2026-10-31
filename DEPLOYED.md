@@ -4,13 +4,13 @@ Written by `npm run deploy`. Do not edit by hand.
 
 | | |
 |---|---|
-| **Deployed at** | 2026-10-31 12:21 UTC |
-| **Version** | v0.1.7 |
-| **Commit** | `1f776cd` — Release v0.1.7 |
-| **Bundle** | `assets/index-DOMwdCmS.js` |
-| **Worker version** | `7f3961bc-d9cf-4e28-ab99-89750065251a` |
+| **Deployed at** | 2026-10-31 12:54 UTC |
+| **Version** | v0.1.8 |
+| **Commit** | `f2eb510` — Release v0.1.8 |
+| **Bundle** | `assets/index-Dsv1o4Wp.js` |
+| **Worker version** | `1390ad8c-5343-4e19-a46f-75f5c7a4f209` |
 | **Live** | https://hhhero.tonydefazio.workers.dev https://hhhero.tonydefazio.com |
-| **Earlier versions** | v0.1.6 at /v/0.1.6/, v0.1.5 at /v/0.1.5/ |
+| **Earlier versions** | v0.1.7 at /v/0.1.7/, v0.1.6 at /v/0.1.6/ |
 
 Verified at deploy time: tests pass, CSP in the shipped HTML, Born stamp baked
 from the true root commit, every URL above serving this bundle, and no
