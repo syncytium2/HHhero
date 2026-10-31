@@ -25,6 +25,16 @@ all ... the rest keep in mind once we get a reviewable tool live." Kept in mind:
 - **Single channels.** A few hundred stochastic channels whose average is m³h.
 - **Equations as MathML**, with the edited term highlighted live.
 - **Lecture mode**: two or three plots at once, larger type, keyboard control.
+- **Reorder the tiles.** Asked for 2026-10-30, parked so as not to change
+  the layout under students already using it. Plan: a small up/down button
+  on each card head swaps it with its neighbor, kept in localStorage per
+  device, with a reset. On a phone only the two plot cards move; the
+  controls stay at the bottom so a slider and the plots stay on screen
+  together (the screenshot check enforces that). On a wide screen the same
+  control swaps the controls column to the left. Drag-and-drop was
+  considered and set aside: it needs a handle so it does not collide with
+  the plots' pinch, pan and drag-to-zoom, and a library, for little gain
+  over a swap.
 - **State in the URL**, so a lecturer can send a configuration to students'
   phones.
 - **Installable and offline** (a same-origin service worker), for classroom
