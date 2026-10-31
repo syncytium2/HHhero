@@ -214,6 +214,31 @@ await phone.locator(".chips").getByRole("tab", { name: "Protocol", exact: true }
 await phone.getByRole("button", { name: "step through" }).tap();
 await phone.waitForTimeout(80);
 if (await phone.locator(".stepper").count()) problems.push("phone: turning Step off left the stepper");
+// focus: the curves card goes, the traces take its height, and the traces and a slider still share the screen
+const focusVis = async (pg) => pg.evaluate(() => {
+  const r = (s) => document.querySelector(s)?.getBoundingClientRect();
+  const s = r(".sim"), k = r(".controls .slider");
+  return { curves: !!document.querySelector(".curves"), simBottom: s?.bottom, sliderTop: k?.top, h: innerHeight };
+});
+const spikeVH = async (pg) => (await pg.locator('svg[aria-label="membrane potential"]').boundingBox())?.height ?? 0;
+const vBefore = await spikeVH(phone);
+await phone.getByRole("button", { name: "focus on the traces" }).tap();
+await phone.waitForTimeout(150);
+await phone.screenshot({ path: `${out}/phone-focus-spike.png` });
+const fv = await focusVis(phone);
+if (fv.curves) problems.push("phone: Focus left the curves card");
+if (!(fv.simBottom <= fv.h && fv.sliderTop < fv.h - 44)) problems.push(`phone: in Focus the traces and a slider are not on screen together ${JSON.stringify(fv)}`);
+if (!((await spikeVH(phone)) > vBefore * 1.5)) problems.push(`phone: Focus did not make the V trace taller (${vBefore} -> ${await spikeVH(phone)})`);
+await noSideways(phone, "phone focus");
+await phone.getByRole("button", { name: "Voltage clamp" }).tap();
+await phone.waitForTimeout(150);
+await phone.screenshot({ path: `${out}/phone-focus-clamp.png` });
+const fc = await focusVis(phone);
+if (!(fc.simBottom <= fc.h && fc.sliderTop < fc.h - 44)) problems.push(`phone: in Focus the clamp and a slider are not on screen together ${JSON.stringify(fc)}`);
+await phone.getByRole("button", { name: "Spike (action potential)" }).tap();
+await phone.getByRole("button", { name: "focus on the traces" }).tap();
+await phone.waitForTimeout(100);
+if (!(await phone.locator(".curves").count())) problems.push("phone: turning Focus off did not bring the curves back");
 
 await phone.getByRole("button", { name: "about" }).tap();
 await phone.waitForTimeout(100);
@@ -295,6 +320,13 @@ if (!((await wTick()) < full0)) problems.push("wide: with the cursor on, a drag 
 await wide.getByRole("button", { name: "Reset zoom" }).click();
 await wide.getByRole("button", { name: "measuring cursor" }).click();
 if (await wide.locator(".reading").count()) problems.push("wide: turning the cursor off left a reading");
+await wide.getByRole("button", { name: "focus on the traces" }).click();
+await wide.waitForTimeout(150);
+await wide.screenshot({ path: `${out}/wide-focus.png` });
+if (await wide.locator(".curves").count()) problems.push("wide: Focus left the curves card");
+const wf = await wide.evaluate(() => { const s = document.querySelector(".sim").getBoundingClientRect(); return { bottom: s.bottom, h: innerHeight }; });
+if (!(wf.bottom <= wf.h)) problems.push(`wide: in Focus the simulation card runs off the screen ${JSON.stringify(wf)}`);
+await wide.getByRole("button", { name: "focus on the traces" }).click();
 await wide.getByRole("radio", { name: "x∞, τ" }).click();
 await wide.waitForTimeout(150);
 await wide.screenshot({ path: `${out}/wide-it.png` });

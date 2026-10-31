@@ -76,6 +76,16 @@ function useWide() {
   return wide;
 }
 
+function useWinH() {
+  const [h, setH] = useState(() => (typeof innerHeight === "number" ? innerHeight : 900));
+  useEffect(() => {
+    const f = () => setH(innerHeight);
+    addEventListener("resize", f);
+    return () => removeEventListener("resize", f);
+  }, []);
+  return h;
+}
+
 function curves(md: Model, id: GateId) {
   const g = md.g[id];
   return {
@@ -115,6 +125,13 @@ export function App() {
   const [stim, setStim] = useState<Stimulus>(DEFAULT_STIM);
   const [cursor, setCursor] = useState(-40);
   const [about, setAbout] = useState(false);
+  // focus: the curves card hides and the traces take its height, for teaching from the front of a room; remembered per device
+  const [focus, setFocus] = useState(() => { try { return localStorage.getItem("hhhero.focus") === "1"; } catch { return false; } });
+  const toggleFocus = () => {
+    const on = !focus;
+    setFocus(on);
+    try { localStorage.setItem("hhhero.focus", on ? "1" : "0"); } catch { /* private window: not remembered */ }
+  };
   const [clampX, setClampX] = useState<Range | null>(null);
   // stepping through: one sweep at a time, forward and back, for teaching from the front of a room
   const [stepping, setStepping] = useState(false);
@@ -124,6 +141,7 @@ export function App() {
   const [ladderSpec, setLadderSpec] = useState<LadderSpec | null>(null);
   const [spikeX, setSpikeX] = useState<Range | null>(null);
   const wide = useWide();
+  const winH = useWinH();
   // a mouse or trackpad (hover and a fine pointer) gets the desktop zoom hint; touch gets the gestures
   const mouse = useMedia("(hover: hover) and (pointer: fine)");
   // a new view or chip starts at the top of the panel, where the notes are
@@ -225,9 +243,12 @@ export function App() {
   };
   const anyEdited = (["m", "h", "n", "na", "k", "mem", "proto"] as Sel[]).some(edited);
 
+  // in focus the traces take the height the curves card gave up
+  // (on a wide screen, the window's height, less the stepper's row when it is showing)
+  const stepH = stepping ? 60 : 0;
   const H = wide
-    ? { curve: 260, strip: 72, sim: 280, v: 170, sim2: 180 }
-    : { curve: 132, strip: 46, sim: 124, v: 64, sim2: 80 };
+    ? focus ? { curve: 260, strip: 90, sim: Math.max(280, winH - 270 - stepH), v: Math.max(170, (winH - 260 - stepH) / 2), sim2: Math.max(180, (winH - 260 - stepH) / 2) } : { curve: 260, strip: 72, sim: 280, v: 170, sim2: 180 }
+    : focus ? { curve: 132, strip: 60, sim: 320, v: 150, sim2: 190 } : { curve: 132, strip: 46, sim: 124, v: 64, sim2: 80 };
 
   // ------------------------------------------------------------ curves
   const one = shown.length === 1;
@@ -702,7 +723,7 @@ export function App() {
         </p>
       )}
       <main className="plots">
-        <section className="card curves" aria-label="gate curves">
+        {!focus && <section className="card curves" aria-label="gate curves">
           <div className="card-head">
             <span className="gate-pick">
               {GATE_IDS.map((id) => (
@@ -723,7 +744,7 @@ export function App() {
           </div>
           {curvePlots}
           {readout}
-        </section>
+        </section>}
 
         <section className="card sim" aria-label="simulation">
           <div className="card-head">
@@ -778,6 +799,7 @@ export function App() {
             {(tab === "spike" || !iv) && (
               <button className={`measure-btn${measure ? " on" : ""}`} aria-pressed={measure} aria-label="measuring cursor" onClick={toggleMeasure}>Cursor</button>
             )}
+            <button className={`measure-btn${focus ? " on" : ""}`} aria-pressed={focus} aria-label="focus on the traces" onClick={toggleFocus}>Focus</button>
           </div>
         </section>
       </main>

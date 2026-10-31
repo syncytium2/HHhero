@@ -22,7 +22,8 @@ in the other view says so, with a reset.
 For teaching from the front, the Step switch over the traces walks the
 voltage-clamp family one sweep at a time, or a ladder of current pulses up to
 and across threshold (your own ladder, if you set one in Protocol). The arrow
-keys and a presentation clicker step too.
+keys and a presentation clicker step too. Focus, under the traces, hides the
+gate curves and gives the traces the screen; the device remembers it.
 
 ## The model
 

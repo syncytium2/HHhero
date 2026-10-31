@@ -216,3 +216,16 @@ picked), and a slider changes only the cell. Once the cell has moved, the step
 text drops "1% under threshold" (no longer true) and says where the pulses were
 set and where threshold is now, with a Re-center button that rebuilds them
 around the new threshold. Your own pulses were already fixed amplitudes.
+
+## 2026-10-31: Focus
+
+The owner asked how to collapse tiles so an instructor can focus on the trace
+or the curves, then chose a single Focus button over a collapse chevron on each
+card. Focus hides the curves card and the traces take its height: on a phone,
+fixed heights that still leave a slider on screen (the screenshot check holds
+that); on a wide screen, the window's height, so a projector's whole screen is
+traces, less a row when Step is showing. The slider panel never hides, since
+the point is to move one and watch. Off by default; remembered per device in
+localStorage (`hhhero.focus`), so students see what they saw before, and an
+instructor's laptop stays as it was left. Collapsing the simulation card
+instead, to make the curves big, is not built; it would be the same mechanism.
