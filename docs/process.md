@@ -204,3 +204,15 @@ and records them in DEPLOYED.md. To keep more than two, change `KEEP` in
 Two Git Bash traps on the way: it rewrites an argument like `/v/0.1.4/` into
 the Windows drive `v:`, so the build runs with `MSYS_NO_PATHCONV=1`, and with
 that set, absolute paths stop being converted, so the build uses relative ones.
+
+## 2026-10-31: the pulses stay put while a slider moves
+
+The owner: dragging a parameter in step mode made the injected-current axis
+jump; they want to set a pulse just under threshold, then move a parameter and
+watch what it does. The "Around threshold" pulses were rebuilt from the cell's
+threshold on every slider move, so the pulse itself changed. Now they are built
+from the cell as it was when stepping began (or when "Around threshold" is
+picked), and a slider changes only the cell. Once the cell has moved, the step
+text drops "1% under threshold" (no longer true) and says where the pulses were
+set and where threshold is now, with a Re-center button that rebuilds them
+around the new threshold. Your own pulses were already fixed amplitudes.

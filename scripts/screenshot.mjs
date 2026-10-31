@@ -49,7 +49,7 @@ const small = await phone.evaluate(() =>
     .filter((e) => e.offsetParent !== null)
     .map((e) => {
       const r = e.getBoundingClientRect();
-      const min = e.closest(".gate-pick, .tabs, .log-btn, .step-btn, .measure-btn") ? 36 : 44;
+      const min = e.closest(".gate-pick, .tabs, .log-btn, .step-btn, .measure-btn, .recenter") ? 36 : 44;
       return { t: (e.getAttribute("aria-label") || e.textContent || e.className).trim().slice(0, 30), h: Math.round(r.height), w: Math.round(r.width), min };
     })
     .filter((x) => x.h < x.min || x.w < Math.min(x.min, 36)),
@@ -195,6 +195,22 @@ await phone.waitForTimeout(150);
 if (!/of \d+/.test(await stepText(phone))) problems.push("phone: no step text with my own pulses");
 await phone.screenshot({ path: `${out}/phone-step-own.png` });
 await phone.getByRole("radio", { name: "Around threshold" }).tap();
+// a slider changes the cell, not the pulses: the pulse stays put, and Re-center rebuilds them around the new threshold
+await phone.waitForTimeout(150);
+const pulseAmp = (t) => /: (\S+) µA\/cm²/.exec(t)?.[1];
+const ampBefore = pulseAmp(await stepText(phone));
+await phone.locator(".chips").getByRole("tab", { name: "Na", exact: true }).tap();
+for (let i = 0; i < 15; i++) await phone.getByRole("button", { name: "decrease ḡNa" }).tap();
+await phone.waitForTimeout(200);
+const afterSlide = await stepText(phone);
+if (pulseAmp(afterSlide) !== ampBefore) problems.push(`phone: a slider changed the pulse (${ampBefore} → "${afterSlide}")`);
+if (!afterSlide.includes("were set around")) problems.push(`phone: after a slider the step text does not say where threshold was ("${afterSlide}")`);
+await phone.screenshot({ path: `${out}/phone-step-moved.png` });
+await phone.getByRole("button", { name: "Re-center" }).tap();
+await phone.waitForTimeout(200);
+if (await phone.getByRole("button", { name: "Re-center" }).count()) problems.push("phone: Re-center did not re-center");
+for (let i = 0; i < 15; i++) await phone.getByRole("button", { name: "increase ḡNa" }).tap();
+await phone.locator(".chips").getByRole("tab", { name: "Protocol", exact: true }).tap();
 await phone.getByRole("button", { name: "step through" }).tap();
 await phone.waitForTimeout(80);
 if (await phone.locator(".stepper").count()) problems.push("phone: turning Step off left the stepper");

@@ -139,19 +139,33 @@ export function App() {
   const apStock = useMemo(() => spike(STOCK_MODEL, { ...stim, sweep: sweepMs }), [stim, sweepMs]);
 
   // the pulses to step through: even steps up to this cell's threshold, then across it; or your own
-  const ladder = useMemo(() => {
+  // The pulses around threshold are built from the cell as it was when stepping began (or was re-centered), so moving
+  // a slider changes the cell, not the stimulus: pick a pulse just under threshold, then see what a parameter does to it.
+  const [ladderP, setLadderP] = useState<Params | null>(null);
+  const pinned = ladderP ?? p;
+  const ladderBase = useMemo(() => {
     if (!stepping || tab !== "spike") return null;
+    if (ladderSpec) return { thr0: null, base: evenLadder(ladderSpec.first, ladderSpec.by, ladderSpec.count) };
+    const st = { ...stim, sweep: sweepMs };
+    const m0 = buildModel(pinned);
+    const thr0 = pulseThreshold(m0, st, settle(m0, st.hold, SETTLE_MS, DT), DT);
+    return { thr0, base: thresholdLadder(thr0, st.amp) };
+  }, [pinned, stim, sweepMs, stepping, tab, ladderSpec]);
+  // the cell has moved since the pulses were built around its threshold
+  const moved = !ladderSpec && ladderP !== null && JSON.stringify(ladderP) !== JSON.stringify(p);
+  const ladder = useMemo(() => {
+    if (!ladderBase) return null;
     const st = { ...stim, sweep: sweepMs };
     const from = settle(md, st.hold, SETTLE_MS, DT);
-    const thr = pulseThreshold(md, st, from, DT);
-    const base = ladderSpec ? evenLadder(ladderSpec.first, ladderSpec.by, ladderSpec.count) : thresholdLadder(thr, st.amp);
-    const rungs = base.map((r) => ({
+    const thr = moved || ladderSpec ? pulseThreshold(md, st, from, DT) : ladderBase.thr0;
+    const rungs = ladderBase.base.map((r) => ({
       ...r,
       fired: fires(md, { ...st, amp: r.amp }, from, DT),
       run: freeRun(md, { ...st, amp: r.amp }, from, DT, 5),
     }));
-    return { thr, rungs };
-  }, [md, stim, sweepMs, stepping, tab, ladderSpec]);
+    return { thr, thr0: ladderBase.thr0, rungs };
+  }, [md, ladderBase, moved, ladderSpec, stim, sweepMs]);
+  const recenter = () => setLadderP(p);
   // the even part of the threshold ladder, as a starting point for your own
   const autoSpec = useMemo((): LadderSpec | null => {
     if (sel !== "proto") return null;
@@ -186,7 +200,7 @@ export function App() {
     return () => removeEventListener("keydown", onKey);
   }, [stepping]);
   const toggleStepping = () => {
-    if (!stepping) { setClampK(0); setSpikeK(0); }
+    if (!stepping) { setClampK(0); setSpikeK(0); setLadderP(p); }
     setStepping(!stepping);
   };
 
@@ -515,8 +529,12 @@ export function App() {
     const head = `Pulse ${k + 1} of ${nSteps}: ${fmt(r.amp)} µA/cm², ${r.fired ? "spike" : "no spike"}`;
     const thr = ladder.thr === null ? "" : `Threshold is ${fmt(ladder.thr)} µA/cm².`;
     const firstToFire = r.fired && (k === 0 || !ladder.rungs[k - 1].fired);
+    // once a slider has moved the cell, "1% under threshold" no longer holds: say where threshold was and is
+    const was = ladder.thr0 === null ? "" : `The pulses were set around ${fmt(ladder.thr0)} µA/cm²; `;
+    const now = ladder.thr === null ? "this cell now has no threshold." : `threshold is now ${fmt(ladder.thr)}.`;
     stepText =
-      r.role === "under" ? `${head}, 1% under threshold.`
+      moved ? `${head}. ${was}${was ? now : now[0].toUpperCase() + now.slice(1)}`
+      : r.role === "under" ? `${head}, 1% under threshold.`
       : r.role === "over" ? `${head}, 1% over. ${thr}`
       : r.role === "strong" ? `${head}, twice threshold: it fires sooner.`
       : firstToFire ? `${head}: the first to fire. ${thr}`
@@ -638,7 +656,7 @@ export function App() {
               : "even steps up to threshold, then 1% under, 1% over, twice"}
           </legend>
           <div className="ladder-pick" role="radiogroup" aria-label="pulses to step through">
-            <button role="radio" aria-checked={!ladderSpec} className={!ladderSpec ? "on" : ""} onClick={() => setLadderSpec(null)}>Around threshold</button>
+            <button role="radio" aria-checked={!ladderSpec} className={!ladderSpec ? "on" : ""} onClick={() => { setLadderSpec(null); setLadderP(p); }}>Around threshold</button>
             <button role="radio" aria-checked={!!ladderSpec} className={ladderSpec ? "on" : ""} onClick={() => !ladderSpec && autoSpec && setLadderSpec(autoSpec)}>My own</button>
           </div>
           {ladderSpec && autoSpec && (
@@ -737,7 +755,10 @@ export function App() {
           {stepping && (
             <div className="stepper" role="group" aria-label="steps">
               <button aria-label="previous step" disabled={k === 0} onClick={() => go(-1)}>‹</button>
-              <span className="step-text" aria-live="polite">{stepText}</span>
+              <span className="step-text" aria-live="polite">
+                {stepText}
+                {moved && tab === "spike" && <> <button className="recenter" onClick={recenter}>Re-center</button></>}
+              </span>
               <button aria-label="next step" disabled={k === nSteps - 1} onClick={() => go(1)}>›</button>
             </div>
           )}
