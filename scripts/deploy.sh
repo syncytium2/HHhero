@@ -46,6 +46,26 @@ step "Clean build"
 rm -rf dist
 npm run --silent build 2>&1 | tail -4
 
+step "Earlier versions -> dist/v/ (so a user can go back)"
+# Each is built from its own release commit, checked out under .versions/
+# (gitignored) so it finds this checkout's node_modules by walking up.
+# Built with its own vite.config, so its CSP and Born stamp are its own.
+EARLIER="$(node scripts/earlier-versions.ts)"
+cleanup_versions() { for d in "$ROOT"/.versions/*/; do [[ -d "$d" ]] && git worktree remove --force "$d" 2>/dev/null; done; git worktree prune; rm -rf "$ROOT/.versions"; }
+trap cleanup_versions EXIT
+while read -r ver commit date; do
+  [[ -z "${ver:-}" ]] && continue
+  wt="$ROOT/.versions/$ver"
+  git worktree add -q --detach "$wt" "$commit"
+  # Relative paths, and MSYS_NO_PATHCONV: Git Bash would otherwise turn /v/... into the drive v:
+  (cd "$wt" && MSYS_NO_PATHCONV=1 node ../../node_modules/vite/bin/vite.js build --base "/v/$ver/" --outDir "../../dist/v/$ver" --emptyOutDir --logLevel error)
+  rm -f "dist/v/$ver/_headers" "dist/v/$ver/robots.txt"
+  grep -Eq "connect-src ('|&#39;)none('|&#39;)" "dist/v/$ver/index.html" || fail "CSP missing from v$ver"
+  grep -q "/v/$ver/assets/" "dist/v/$ver/index.html" || fail "v$ver not built for /v/$ver/"
+  echo "  v$ver from $commit ($date)"
+done <<< "$EARLIER"
+cleanup_versions
+
 step "Gates"
 grep -Eq "connect-src ('|&#39;)none('|&#39;)" dist/index.html || fail "CSP missing from dist/index.html"
 echo "  CSP present"
@@ -78,6 +98,12 @@ for u in "${URLS[@]}"; do
   n="$(curl -sL --max-time 15 -H "User-Agent: $UA" "$u/" | grep -c cloudflareinsights || true)"
   [[ "$n" == 0 ]] || fail "third-party beacon injected into $u/"
   echo "  no third-party beacon on $u/ (asked as a phone browser)"
+  while read -r ver commit date; do
+    [[ -z "${ver:-}" ]] && continue
+    code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 "$u/v/$ver/")"
+    [[ "$code" == 200 ]] || fail "$u/v/$ver/ answered $code"
+    echo "  $u/v/$ver/ serving the earlier version"
+  done <<< "$EARLIER"
 done
 
 step "Recording -> DEPLOYED.md"
@@ -94,6 +120,7 @@ Written by \`npm run deploy\`. Do not edit by hand.
 | **Bundle** | \`$LOCAL_HASH\` |
 | **Worker version** | \`${VERSION_ID:-unknown}\` |
 | **Live** | ${URLS[*]} |
+| **Earlier versions** | $(echo "$EARLIER" | awk 'NF {printf "%sv%s at /v/%s/", (n++ ? ", " : ""), $1, $1}') |
 
 Verified at deploy time: tests pass, CSP in the shipped HTML, Born stamp baked
 from the true root commit, every URL above serving this bundle, and no

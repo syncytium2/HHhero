@@ -22,6 +22,9 @@ between the two. One model, two sets of controls. The core is `src/core/`
   not on screen together. Run it after any UI change.
 - `npm run deploy`: the only way to deploy (on Windows, `bash scripts/deploy.sh`
   from Git Bash). Do not hand-roll `wrangler deploy`.
+  It also rebuilds the two previous releases into `dist/v/<version>/`, so
+  users can go back (`scripts/earlier-versions.ts`; About links to them).
+  Those builds use today's node_modules: a dependency change can break them.
 
 ## Rules that are load-bearing
 

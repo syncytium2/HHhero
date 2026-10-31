@@ -21,7 +21,7 @@ import {
   type ClampProtocol, type Stimulus,
 } from "./core/sim.ts";
 import { noteFor, type View } from "./core/notes.ts";
-import { BORN, VERSION } from "./version.ts";
+import { ARCHIVED, BORN, EARLIER, VERSION } from "./version.ts";
 
 type Sel = GateId | "na" | "k" | "mem" | "proto";
 type SimTab = "clamp" | "spike";
@@ -678,6 +678,11 @@ export function App() {
         <button className="about-btn" aria-label="about" onClick={() => setAbout(true)}>?</button>
       </header>
 
+      {ARCHIVED && (
+        <p className="archived">
+          You are using an earlier version, v{VERSION}. <a href="/">Back to the current version</a>
+        </p>
+      )}
       <main className="plots">
         <section className="card curves" aria-label="gate curves">
           <div className="card-head">
@@ -793,6 +798,26 @@ export function App() {
               sign (rest −65 mV, depolarization positive). With nothing edited it is NEURON's built-in hh mechanism: the tests
               hold it to NEURON's spike times on 21 current steps. Everything here is the model alone, with no electrode: what
               no rig can record.
+            </p>
+            <h3>Versions</h3>
+            <p className="versions">
+              {ARCHIVED ? (
+                <>This is an earlier version, v{VERSION}. <a href="/">Go to the current version</a>.</>
+              ) : (
+                <>This is v{VERSION}, the current version.</>
+              )}
+              {EARLIER.length > 0 && !ARCHIVED && (
+                <>
+                  {" "}If something stopped working, the previous ones are still here:{" "}
+                  {EARLIER.map((e, j) => (
+                    <span key={e.version}>
+                      {j > 0 && ", "}
+                      <a href={`/v/${e.version}/`}>v{e.version}</a> ({e.date})
+                    </span>
+                  ))}
+                  .
+                </>
+              )}
             </p>
             <p className="muted">
               HHhero v{VERSION} · born {BORN.slice(0, 10)} ·{" "}

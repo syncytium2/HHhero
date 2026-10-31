@@ -202,6 +202,7 @@ if (await phone.locator(".stepper").count()) problems.push("phone: turning Step 
 await phone.getByRole("button", { name: "about" }).tap();
 await phone.waitForTimeout(100);
 await phone.screenshot({ path: `${out}/phone-about.png` });
+if (!(await phone.getByRole("heading", { name: "Versions" }).count())) problems.push("phone: About has no Versions section");
 await phone.getByRole("button", { name: "Close" }).tap();
 
 // ---------------------------------------------------------------- wide

@@ -7,3 +7,6 @@
   Cache-Control: public, max-age=0, must-revalidate, no-transform
 /index.html
   Cache-Control: public, max-age=0, must-revalidate, no-transform
+# the earlier versions a user can go back to (scripts/deploy.sh builds them into dist/v/)
+/v/*
+  Cache-Control: public, max-age=0, must-revalidate, no-transform

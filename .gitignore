@@ -1,5 +1,7 @@
 node_modules/
 dist/
+# earlier versions checked out by scripts/deploy.sh while it builds them
+.versions/
 .DS_Store
 *.local
 .wrangler/

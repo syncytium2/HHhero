@@ -2,6 +2,7 @@ import { execSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
+import { earlierVersions } from "./scripts/earlier-versions.ts";
 
 const { version } = JSON.parse(readFileSync("./package.json", "utf8")) as { version: string };
 
@@ -51,5 +52,7 @@ export default defineConfig({
     __APP_VERSION__: JSON.stringify(version),
     __BUILD_BORN__: JSON.stringify(BORN),
     __BUILD_UPDATED__: JSON.stringify(UPDATED),
+    // the earlier releases this deploy also serves, at /v/<version>/ (scripts/deploy.sh builds them)
+    __EARLIER_VERSIONS__: JSON.stringify(earlierVersions().map(({ version: v, date }) => ({ version: v, date }))),
   },
 });

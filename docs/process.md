@@ -183,3 +183,24 @@ rather than switch). Separate the iv button", and "Na and k buttons would
 toggle iv plot view too". INa and IK are now colored toggles like m, h and n
 (at least one stays on). They choose the currents on the traces and on the
 I–V alike; I–V is its own on/off button beside them.
+
+## 2026-10-31: going back to an earlier version
+
+The owner, now that students use it: "Just in case please add a version
+selector so the user can revert to a previous version starting with the last
+two versions." Each deploy now also builds the two releases before it from
+their own "Release v…" commits (a temporary git worktree under `.versions/`,
+gitignored, found by `scripts/earlier-versions.ts`) and serves them at
+`/v/<version>/`, each with its own CSP and Born stamp. Rebuilt v0.1.3 and
+v0.1.4 came out byte-for-byte the bundles that were deployed. The About
+dialog's Versions section links to them; nothing is fetched, the list is
+baked in at build. A version served under `/v/` says so in a banner with a
+link back to the current one; versions built before this change (v0.1.5 and
+earlier) do not have the banner, so the back button or the plain address is
+the way back from those. The deploy checks each `/v/<version>/` answers 200
+and records them in DEPLOYED.md. To keep more than two, change `KEEP` in
+`scripts/earlier-versions.ts`.
+
+Two Git Bash traps on the way: it rewrites an argument like `/v/0.1.4/` into
+the Windows drive `v:`, so the build runs with `MSYS_NO_PATHCONV=1`, and with
+that set, absolute paths stop being converted, so the build uses relative ones.
