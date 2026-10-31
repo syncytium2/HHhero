@@ -49,7 +49,7 @@ const small = await phone.evaluate(() =>
     .filter((e) => e.offsetParent !== null)
     .map((e) => {
       const r = e.getBoundingClientRect();
-      const min = e.closest(".gate-pick, .tabs, .log-btn, .step-btn") ? 36 : 44;
+      const min = e.closest(".gate-pick, .tabs, .log-btn, .step-btn, .measure-btn") ? 36 : 44;
       return { t: (e.getAttribute("aria-label") || e.textContent || e.className).trim().slice(0, 30), h: Math.round(r.height), w: Math.round(r.width), min };
     })
     .filter((x) => x.h < x.min || x.w < Math.min(x.min, 36)),
@@ -122,6 +122,21 @@ await phone.getByRole("button", { name: "Reset zoom" }).tap();
 await phone.waitForTimeout(100);
 if ((await lastTick(tracesSel)) !== before) problems.push("phone: Reset zoom did not restore the full time axis");
 if (!(await phone.locator('svg[aria-label="voltage-clamp protocol"]').count())) problems.push("phone: no protocol strip on the clamp traces");
+
+// the touch cursor: off by default; a tap measures; a pinch still zooms
+if (await phone.locator(".reading").count()) problems.push("phone: the cursor is on by default");
+await phone.getByRole("button", { name: "measuring cursor" }).tap();
+const pb = await phone.locator(tracesSel).boundingBox();
+await phone.touchscreen.tap(pb.x + pb.width * 0.4, pb.y + pb.height * 0.5);
+await phone.waitForTimeout(150);
+const pr = (await phone.locator(".reading").count()) ? await phone.locator(".reading").textContent() : "";
+if (!pr.startsWith("t ")) problems.push(`phone: a tap did not place the cursor ("${pr}")`);
+await phone.screenshot({ path: `${out}/phone-cursor.png` });
+await phone.waitForTimeout(400); // past the double-tap window
+await pinch(tracesSel);
+if (!((await lastTick(tracesSel)) < before)) problems.push("phone: with the cursor on, a pinch no longer zooms");
+await phone.getByRole("button", { name: "Reset zoom" }).tap();
+await phone.getByRole("button", { name: "measuring cursor" }).tap();
 
 await phone.getByRole("button", { name: "Action potential" }).tap();
 await phone.waitForTimeout(200);
@@ -225,8 +240,44 @@ await wide.screenshot({ path: `${out}/wide-step-clamp.png` });
 await wide.getByRole("button", { name: "I–V" }).click();
 await wide.waitForTimeout(100);
 await wide.screenshot({ path: `${out}/wide-step-iv.png` });
-await wide.getByRole("button", { name: "INa" }).click();
+await wide.getByRole("button", { name: "I–V" }).click();
 await wide.getByRole("button", { name: "step through" }).click();
+// INa and IK toggle, together on one plot
+await wide.getByRole("button", { name: "IK", exact: true }).click();
+await wide.waitForTimeout(100);
+if (!(await wide.locator('svg[aria-label="sodium and potassium current families"]').count())) problems.push("wide: INa and IK together did not draw both families");
+await wide.screenshot({ path: `${out}/wide-both.png` });
+await wide.getByRole("button", { name: "IK", exact: true }).click();
+// the mouse cursor: a click measures, dragging the line moves it, and a drag elsewhere still zooms
+const reading = async () => (await wide.locator(".reading").count()) ? await wide.locator(".reading").textContent() : "";
+await wide.getByRole("button", { name: "measuring cursor" }).click();
+const cb = await wide.locator(wSel).boundingBox();
+await wide.mouse.click(cb.x + cb.width * 0.3, cb.y + cb.height * 0.5);
+await wide.waitForTimeout(100);
+const r1 = await reading();
+if (!r1.startsWith("t ")) problems.push(`wide: a click did not place the cursor ("${r1}")`);
+if ((await wTick()) !== full0) problems.push("wide: a click to measure zoomed");
+// grab the line where it was placed and drag it right (after a pause: two quick presses in one place are a double-click)
+await wide.waitForTimeout(400);
+const lx = await wide.evaluate((sel) => { const l = document.querySelector(`${sel} .cursor`); const r = l.getBoundingClientRect(); return r.left + r.width / 2; }, wSel);
+await wide.mouse.move(lx, cb.y + cb.height * 0.5);
+await wide.mouse.down();
+await wide.mouse.move(lx + cb.width * 0.2, cb.y + cb.height * 0.5, { steps: 6 });
+await wide.mouse.up();
+await wide.waitForTimeout(100);
+const r2 = await reading();
+if (r2 === r1) problems.push("wide: dragging the cursor line did not move it");
+if ((await wTick()) !== full0) problems.push("wide: dragging the cursor line zoomed");
+await wide.screenshot({ path: `${out}/wide-cursor.png` });
+await wide.mouse.move(cb.x + cb.width * 0.05, cb.y + cb.height * 0.5);
+await wide.mouse.down();
+await wide.mouse.move(cb.x + cb.width * 0.15, cb.y + cb.height * 0.5, { steps: 6 });
+await wide.mouse.up();
+await wide.waitForTimeout(100);
+if (!((await wTick()) < full0)) problems.push("wide: with the cursor on, a drag no longer zooms");
+await wide.getByRole("button", { name: "Reset zoom" }).click();
+await wide.getByRole("button", { name: "measuring cursor" }).click();
+if (await wide.locator(".reading").count()) problems.push("wide: turning the cursor off left a reading");
 await wide.getByRole("radio", { name: "x∞, τ" }).click();
 await wide.waitForTimeout(150);
 await wide.screenshot({ path: `${out}/wide-it.png` });

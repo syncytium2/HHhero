@@ -65,6 +65,12 @@ a { color: inherit; }
 .app.wide .step-text { font-size: 16px; }
 .ladder-pick { display: flex; gap: 6px; margin: 4px 0 6px; }
 .ladder-pick button { flex: 1; min-height: 44px; }
+.iv-btn { margin-left: 6px; }
+.cap-text { flex: 1 1 0; min-width: 0; }
+.reading { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+.measure-btn { min-height: 36px; min-width: 44px; padding: 0 8px; font-size: 13px; margin-left: 6px; }
+.app.wide .caption { font-size: 13px; }
+.app.wide .reading { font-size: 15px; }
 .zoom-reset { min-height: 44px; margin-left: 8px; font-size: 13px; }
 .caption { display: flex; align-items: center; flex-wrap: wrap; }
 .plot svg { display: block; user-select: none; -webkit-user-select: none; }

@@ -3,7 +3,10 @@
  * a few hundred points, and owning the drawing keeps touch handling simple.
  * With `onCursor`, a press-and-drag anywhere on the plot moves a vertical
  * cursor (phones have no hover), and the plot claims the gesture so the page
- * does not scroll under the finger.
+ * does not scroll under the finger. With `onCursor` and `zoom` together, the
+ * gestures split: a tap or click that barely moves places the cursor (and
+ * reports the height tapped, to pick a trace), a press near the cursor line
+ * drags it, and everything else zooms and pans as before.
  */
 import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent } from "react";
 import { spreadLabels } from "./labels.ts";
@@ -33,7 +36,8 @@ interface Props {
   xLabel?: string;
   yLabel?: string;
   cursor?: number;
-  onCursor?: (x: number) => void;
+  /** x, and on a tap or click with zoom also the y tapped, in data units (not on a log axis) */
+  onCursor?: (x: number, y?: number) => void;
   zeroLine?: boolean;
   /** log10 y axis; values at or below 1e-4 are drawn at the floor */
   yLog?: boolean;
@@ -165,21 +169,43 @@ export function Plot({ height, series: raw, x: full, y, yInclude, xLabel, yLabel
   const pts = useRef(new Map<number, number>());
   const gesture = useRef<{ view0: Range; f0: number; d0: number } | null>(null);
   const lastTap = useRef(-Infinity); // time of the last tap; -Infinity: none yet (a press soon after load is not a double-tap)
+  const lastTapX = useRef(0); // and where it was: a double-tap is two quick taps in the same place
+  const isDouble = (now: number, clientX: number) => now - lastTap.current < 300 && Math.abs(clientX - lastTapX.current) < 30;
   const frac = (clientX: number, svg: SVGSVGElement) => (clientX - svg.getBoundingClientRect().left - M.l) / pw;
   const startGesture = (svg: SVGSVGElement) => {
     const xs = [...pts.current.values()];
     const mid = xs.reduce((a, b) => a + b, 0) / xs.length;
     gesture.current = { view0: zoom!.view, f0: frac(mid, svg), d0: xs.length > 1 ? Math.abs(xs[0] - xs[1]) || 1 : 1 };
   };
+  // ---- cursor with zoom: a tap places it, a press near the line drags it
+  const TAP_PX = 8, GRAB_PX = 22;
+  const tap = useRef<{ x: number; y: number; t: number } | null>(null); // a press that may still be a tap
+  const lineDrag = useRef(false);
+  const toY = (clientY: number, svg: SVGSVGElement) => {
+    const v = yr[0] + (1 - (clientY - svg.getBoundingClientRect().top - M.t) / ph) * (yr[1] - yr[0]);
+    return yLog ? undefined : v;
+  };
+  const nearLine = (clientX: number, svg: SVGSVGElement) =>
+    cursor !== undefined && cursor >= x[0] && cursor <= x[1] && Math.abs(clientX - svg.getBoundingClientRect().left - sx(cursor)) < GRAB_PX;
+  const measuring = !!(zoom && onCursor);
   const zoomHandlers = zoom && {
     onPointerDown: (e: PointerEvent<SVGSVGElement>) => {
       const now = e.timeStamp;
-      if (pts.current.size === 0 && now - lastTap.current < 300) {
+      if (measuring && pts.current.size === 0 && dragFrom.current === null) {
+        tap.current = { x: e.clientX, y: e.clientY, t: now };
+        if (nearLine(e.clientX, e.currentTarget) && !isDouble(now, e.clientX)) {
+          lineDrag.current = true;
+          try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* synthetic pointers in tests */ }
+          if (e.pointerType !== "mouse") pts.current.set(e.pointerId, e.clientX);
+          return;
+        }
+      } else tap.current = null; // a second finger: a pinch, not a tap
+      if (pts.current.size === 0 && isDouble(now, e.clientX)) {
         zoom.onView(full);
         lastTap.current = -Infinity;
         return;
       }
-      if (pts.current.size === 0) lastTap.current = now;
+      if (pts.current.size === 0) { lastTap.current = now; lastTapX.current = e.clientX; }
       try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* synthetic pointers in tests */ }
       if (e.pointerType === "mouse") {
         const f = Math.max(0, Math.min(1, frac(e.clientX, e.currentTarget)));
@@ -191,6 +217,12 @@ export function Plot({ height, series: raw, x: full, y, yInclude, xLabel, yLabel
       startGesture(e.currentTarget);
     },
     onPointerMove: (e: PointerEvent<SVGSVGElement>) => {
+      if (tap.current && Math.hypot(e.clientX - tap.current.x, e.clientY - tap.current.y) > TAP_PX) tap.current = null;
+      if (lineDrag.current) {
+        if (!tap.current) lastTap.current = -Infinity;
+        onCursor!(toX(e));
+        return;
+      }
       if (e.pointerType === "mouse") {
         const f0 = dragFrom.current;
         if (f0 !== null) setBand([f0, Math.max(0, Math.min(1, frac(e.clientX, e.currentTarget)))]);
@@ -207,6 +239,17 @@ export function Plot({ height, series: raw, x: full, y, yInclude, xLabel, yLabel
       zoom.onView(pinchView(g.view0, full, g.f0, frac(mid, e.currentTarget), ratio, zoom.minSpan));
     },
     onPointerUp: (e: PointerEvent<SVGSVGElement>) => {
+      const t = tap.current;
+      tap.current = null;
+      const wasTap = measuring && t !== null && e.timeStamp - t.t < 500;
+      if (lineDrag.current) {
+        lineDrag.current = false;
+        pts.current.delete(e.pointerId);
+        gesture.current = null;
+        if (wasTap) onCursor!(toX(e), toY(e.clientY, e.currentTarget));
+        return;
+      }
+      if (wasTap) onCursor!(toX(e), toY(e.clientY, e.currentTarget));
       if (e.pointerType === "mouse") {
         const f0 = dragFrom.current, f1 = Math.max(0, Math.min(1, frac(e.clientX, e.currentTarget)));
         dragFrom.current = null;
@@ -222,6 +265,8 @@ export function Plot({ height, series: raw, x: full, y, yInclude, xLabel, yLabel
       else gesture.current = null;
     },
     onPointerCancel: (e: PointerEvent<SVGSVGElement>) => {
+      tap.current = null;
+      lineDrag.current = false;
       setBand(null);
       dragFrom.current = null;
       pts.current.delete(e.pointerId);

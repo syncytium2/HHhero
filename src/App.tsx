@@ -25,6 +25,24 @@ import { BORN, VERSION } from "./version.ts";
 
 type Sel = GateId | "na" | "k" | "mem" | "proto";
 type SimTab = "clamp" | "spike";
+type Cur = "iNa" | "iK";
+const CUR_LABEL = { iNa: "INa", iK: "IK" } as const;
+
+/** y at time tq along a trace sampled at increasing times t, by linear interpolation */
+function valAt(t: ArrayLike<number>, y: ArrayLike<number>, tq: number): number {
+  const n = t.length;
+  if (n === 0) return NaN;
+  if (tq <= t[0]) return y[0];
+  if (tq >= t[n - 1]) return y[n - 1];
+  let lo = 0, hi = n - 1;
+  while (hi - lo > 1) {
+    const mid = (lo + hi) >> 1;
+    if (t[mid] <= tq) lo = mid;
+    else hi = mid;
+  }
+  const f = (tq - t[lo]) / (t[hi] - t[lo] || 1);
+  return y[lo] + f * (y[hi] - y[lo]);
+}
 interface LadderSpec { first: number; by: number; count: number }
 
 const STOCK = stockParams();
@@ -84,7 +102,14 @@ export function App() {
   const [shown, setShown] = useState<GateId[]>(["m"]);
   const [logY, setLogY] = useState(false);
   const [tab, setTab] = useState<SimTab>("clamp");
-  const [clampTrace, setClampTrace] = useState<"iNa" | "iK" | "iv">("iNa");
+  // the currents drawn in voltage clamp, either or both, on the traces and on the I–V; and whether the I–V replaces the traces
+  const [clampCur, setClampCur] = useState<Cur[]>(["iNa"]);
+  const [iv, setIv] = useState(false);
+  // the measuring cursor on the traces: off until asked for; a time per experiment, and the clamp sweep it reads
+  const [measure, setMeasure] = useState(false);
+  const [clampT, setClampT] = useState<number | null>(null);
+  const [spikeT, setSpikeT] = useState<number | null>(null);
+  const [clampPick, setClampPick] = useState<number | null>(null);
   const [spikeTrace, setSpikeTrace] = useState<"i" | "g" | "gates">("i");
   const [clamp, setClamp] = useState<ClampProtocol>(DEFAULT_CLAMP);
   const [stim, setStim] = useState<Stimulus>(DEFAULT_STIM);
@@ -279,7 +304,37 @@ export function App() {
   // the reset lives in the caption, not over a plot
   const clampZoom = { view: clampView(clampX ?? clampFull, clampFull, 0.5), onView: setClampX, minSpan: 0.5, button: false };
   const spikeZoom = { view: clampView(spikeX ?? spikeFull, spikeFull, 1), onView: setSpikeX, minSpan: 1, button: false };
-  const zoomOn = tab === "clamp" ? clampTrace !== "iv" && !isFull(clampZoom.view, clampFull) : !isFull(spikeZoom.view, spikeFull);
+  const zoomOn = tab === "clamp" ? !iv && !isFull(clampZoom.view, clampFull) : !isFull(spikeZoom.view, spikeFull);
+
+  // the cursor: the clamp sweep it reads is the current step, or the one last tapped, or the last
+  const mi = stepping ? k : Math.min(clampPick ?? n - 1, n - 1);
+  const toggleCur = (c: Cur) =>
+    setClampCur((q) => (q.includes(c) ? (q.length > 1 ? q.filter((x) => x !== c) : q) : (["iNa", "iK"] as Cur[]).filter((x) => x === c || q.includes(x))));
+  // a tap on the traces reads the sweep drawn nearest the tap; on the protocol strip, the nearest command step
+  const nearestSweep = (t: number, y: number, valueOf: (j: number) => number) => {
+    let best = -1, bd = Infinity;
+    for (let j = 0; j < (stepping ? k + 1 : n); j++) {
+      const d = Math.abs(valueOf(j) - y);
+      if (d < bd) { bd = d; best = j; }
+    }
+    if (best >= 0 && !stepping) setClampPick(best);
+    setClampT(t);
+  };
+  const onClampTraces = (t: number, y?: number) => {
+    if (y === undefined) return setClampT(t);
+    let best = -1, bd = Infinity;
+    for (let j = 0; j < (stepping ? k + 1 : n); j++)
+      for (const c of clampCur) {
+        const d = Math.abs(valAt(fam[j].t, fam[j][c], t) / 1000 - y);
+        if (d < bd) { bd = d; best = j; }
+      }
+    if (best >= 0 && !stepping) setClampPick(best);
+    setClampT(t);
+  };
+  const onClampStrip = (t: number, y?: number) => (y === undefined || t <= clamp.pre ? setClampT(t) : nearestSweep(t, y, (j) => fam[j].v));
+  const clampCursor = measure ? { cursor: clampT ?? undefined } : {};
+  const spikeCursor = measure ? { cursor: spikeT ?? undefined, onCursor: (t: number) => setSpikeT(t) } : {};
+  const toggleMeasure = () => { setMeasure(!measure); setClampT(null); setSpikeT(null); setClampPick(null); };
 
   // the protocol strip: what the experimenter commands, on the traces' time axis
   const steps = fam.map((s) => s.v);
@@ -290,6 +345,8 @@ export function App() {
         ariaLabel="voltage-clamp protocol"
         x={clampFull}
         zoom={clampZoom}
+        {...clampCursor}
+        onCursor={measure ? onClampStrip : undefined}
         noXTicks
         yInclude={[clamp.hold, clamp.from, clamp.to]}
         yLabel={`command V (mV): hold ${fmt(clamp.hold)}, steps ${fmt(clamp.from)} to ${fmt(clamp.to)} by ${fmt(clamp.by)}`}
@@ -297,8 +354,8 @@ export function App() {
           x: [0, clamp.pre, clamp.pre, clamp.pre + clamp.dur],
           y: [clamp.hold, clamp.hold, v, v],
           color: C.ink,
-          width: bold(j) ?? 1.2,
-          opacity: fade(j),
+          width: bold(j) ?? (measure && clampT !== null && j === mi ? 2.2 : 1.2),
+          opacity: measure && clampT !== null && j === mi ? 1 : fade(j),
         }))}
       />
     ) : (
@@ -307,6 +364,7 @@ export function App() {
         ariaLabel="current pulse protocol"
         x={spikeFull}
         zoom={spikeZoom}
+        {...spikeCursor}
         noXTicks
         yInclude={[0, stim.hold, ...(ladder ? ladder.rungs.map((r) => stim.hold + r.amp) : [stim.hold + stim.amp])]}
         yLabel={`injected I (µA/cm²): ${fmt(rungAmp ?? stim.amp)} for ${fmt(stim.dur)} ms at ${fmt(stim.start)} ms`}
@@ -322,7 +380,7 @@ export function App() {
 
   let simPlot;
   if (tab === "clamp") {
-    if (clampTrace === "iv") {
+    if (iv) {
       // stepping builds the curve a point at a time, on the axes the whole family needs
       const vs = upTo(fam.map((s) => s.v));
       const pk = (f: typeof fam, which: "iNaPeak" | "iKEnd") => upTo(f.map((s) => s[which] / 1000));
@@ -332,34 +390,45 @@ export function App() {
           ariaLabel="current-voltage relation"
           x={[clamp.from - 5, clamp.to + 5]}
           zeroLine
-          yInclude={extent([fam, famStock].flatMap((f) => [f.map((s) => s.iNaPeak / 1000), f.map((s) => s.iKEnd / 1000)]))}
+          yInclude={extent([fam, famStock].flatMap((f) => [
+            ...(clampCur.includes("iNa") ? [f.map((s) => s.iNaPeak / 1000)] : []),
+            ...(clampCur.includes("iK") ? [f.map((s) => s.iKEnd / 1000)] : []),
+          ]))}
           xLabel="test potential (mV)"
           yLabel="I (mA/cm²)"
           series={[
-            { x: vs, y: pk(famStock, "iNaPeak"), color: C.stock, width: 3 },
-            { x: vs, y: pk(famStock, "iKEnd"), color: C.stock, width: 3, dash: "5 4" },
-            { x: vs, y: pk(fam, "iNaPeak"), color: C.na, label: "INa peak", dots: stepping },
-            { x: vs, y: pk(fam, "iKEnd"), color: C.k, dash: "5 4", label: "IK end", dots: stepping },
+            ...(clampCur.includes("iNa") ? [{ x: vs, y: pk(famStock, "iNaPeak"), color: C.stock, width: 3 }] : []),
+            ...(clampCur.includes("iK") ? [{ x: vs, y: pk(famStock, "iKEnd"), color: C.stock, width: 3, dash: "5 4" }] : []),
+            ...(clampCur.includes("iNa") ? [{ x: vs, y: pk(fam, "iNaPeak"), color: C.na, label: "INa peak", dots: stepping }] : []),
+            ...(clampCur.includes("iK") ? [{ x: vs, y: pk(fam, "iKEnd"), color: C.k, dash: "5 4", label: "IK end", dots: stepping }] : []),
           ]}
         />
       );
     } else {
-      const key = clampTrace;
-      const col = key === "iNa" ? C.na : C.k;
+      // either current or both; the sweep the cursor reads (or, with both drawn, the last) carries the label
+      const both = clampCur.length > 1;
+      const labelled = (j: number) => (measure && clampT !== null ? j === mi : both && j === (stepping ? k : n - 1));
       simPlot = (
         <Plot
           height={H.sim}
-          ariaLabel={key === "iNa" ? "sodium current family" : "potassium current family"}
+          ariaLabel={both ? "sodium and potassium current families" : clampCur[0] === "iNa" ? "sodium current family" : "potassium current family"}
           x={clampFull}
           zoom={clampZoom}
+          {...clampCursor}
+          onCursor={measure ? onClampTraces : undefined}
           zeroLine
-          yInclude={stepping ? extent([...fam, ...famStock].map((s) => mA(s[key]))) : [0]}
+          yInclude={stepping ? extent([...fam, ...famStock].flatMap((s) => clampCur.map((c) => mA(s[c])))) : [0]}
           xLabel="ms"
-          yLabel={`${key === "iNa" ? "INa" : "IK"} (mA/cm²)`}
-          series={[
-            ...(stepping ? [famStock[k]] : famStock).map((s) => ({ x: s.t, y: mA(s[key]), color: C.stock, width: 2.5 }) as Series),
-            ...upTo(fam).map((s, j) => ({ x: s.t, y: mA(s[key]), color: col, width: bold(j) ?? 1.4, opacity: fade(j) }) as Series),
-          ]}
+          yLabel={`${clampCur.map((c) => CUR_LABEL[c]).join(", ")} (mA/cm²)`}
+          series={clampCur.flatMap((c) => [
+            ...(stepping ? [famStock[k]] : famStock).map((s) => ({ x: s.t, y: mA(s[c]), color: C.stock, width: 2.5 }) as Series),
+            ...upTo(fam).map((s, j) => ({
+              x: s.t, y: mA(s[c]), color: c === "iNa" ? C.na : C.k,
+              width: bold(j) ?? (measure && clampT !== null && j === mi ? 2.2 : 1.4),
+              opacity: measure && clampT !== null && j === mi ? 1 : fade(j),
+              label: labelled(j) ? CUR_LABEL[c] : undefined, labelAt: "peak",
+            }) as Series),
+          ])}
         />
       );
     }
@@ -388,6 +457,7 @@ export function App() {
           ariaLabel="membrane potential"
           x={spikeFull}
           zoom={spikeZoom}
+          {...spikeCursor}
           noXTicks
           yInclude={[-80, 40]}
           yLabel="V (mV)"
@@ -402,6 +472,7 @@ export function App() {
           ariaLabel={spikeTrace === "gates" ? "gates during the action potential" : "currents during the action potential"}
           x={spikeFull}
           zoom={spikeZoom}
+          {...spikeCursor}
           zeroLine
           y={spikeTrace === "gates" ? [-0.04, 1.04] : undefined}
           yInclude={[0]}
@@ -411,6 +482,28 @@ export function App() {
         />
       </>
     );
+  }
+
+  // what the cursor reads, in words
+  let reading = "";
+  if (measure && tab === "clamp" && !iv) {
+    if (clampT === null) reading = mouse ? "Click a trace to measure it; drag the line to move." : "Tap a trace to measure it; drag the line to move.";
+    else {
+      const sw = fam[mi], t = clampT;
+      const cur = (["iNa", "iK"] as Cur[]).map((c) => `${CUR_LABEL[c]} ${fmt(valAt(sw.t, sw[c], t) / 1000)}`).join(", ");
+      reading = `t ${fmt(t)} ms · ${t > clamp.pre ? `step to ${fmt(sw.v)}` : `hold ${fmt(clamp.hold)}`} mV · ${cur} mA/cm²`;
+    }
+  } else if (measure && tab === "spike") {
+    if (spikeT === null) reading = mouse ? "Click the traces to measure; drag the line to move." : "Tap the traces to measure; drag the line to move.";
+    else {
+      const a = apShown, t = spikeT;
+      const v = (y: ArrayLike<number>) => valAt(a.t, y, t);
+      const more =
+        spikeTrace === "i" ? `INa ${fmt(v(a.iNa) / 1000)}, IK ${fmt(v(a.iK) / 1000)} mA/cm²`
+        : spikeTrace === "g" ? `gNa ${fmt(v(a.gNa))}, gK ${fmt(v(a.gK))} mS/cm²`
+        : `m ${fmt(v(a.m))}, h ${fmt(v(a.h))}, n ${fmt(v(a.n))}`;
+      reading = `t ${fmt(t)} ms · V ${fmt(v(a.v))} mV · ${more}`;
+    }
   }
 
   // what this step is, in words
@@ -618,15 +711,23 @@ export function App() {
             <button className={`step-btn${stepping ? " on" : ""}`} aria-pressed={stepping} aria-label="step through" onClick={toggleStepping}>Step</button>
             <span className="tabs small">
               {tab === "clamp"
-                ? (["iNa", "iK", "iv"] as const).map((k) => (
-                    <button key={k} className={clampTrace === k ? "on" : ""} onClick={() => setClampTrace(k)}>{k === "iNa" ? "INa" : k === "iK" ? "IK" : "I–V"}</button>
-                  ))
+                ? (
+                    <>
+                      {(["iNa", "iK"] as const).map((c) => {
+                        const on = clampCur.includes(c), col = c === "iNa" ? C.na : C.k;
+                        return (
+                          <button key={c} aria-pressed={on} className={on ? "on" : ""} style={on ? { background: col, borderColor: col } : { color: col }} onClick={() => toggleCur(c)}>{CUR_LABEL[c]}</button>
+                        );
+                      })}
+                      <button className={`iv-btn${iv ? " on" : ""}`} aria-pressed={iv} onClick={() => setIv(!iv)}>I–V</button>
+                    </>
+                  )
                 : (["i", "g", "gates"] as const).map((k) => (
                     <button key={k} className={spikeTrace === k ? "on" : ""} onClick={() => setSpikeTrace(k)}>{k === "i" ? "I" : k === "g" ? "g" : "m h n"}</button>
                   ))}
             </span>
           </div>
-          {(tab === "spike" || clampTrace !== "iv") && protocol}
+          {(tab === "spike" || !iv) && protocol}
           {simPlot}
           {stepping && (
             <div className="stepper" role="group" aria-label="steps">
@@ -635,16 +736,23 @@ export function App() {
               <button aria-label="next step" disabled={k === nSteps - 1} onClick={() => go(1)}>›</button>
             </div>
           )}
-          {(!stepping || zoomOn || mouse) && (
-            <p className="caption">
-              {!stepping && (tab === "clamp" ? "Ideal clamp, no electrode: what no rig records." : "The membrane alone, no electrode.")}
-              {!stepping && (tab === "spike" || clampTrace !== "iv") && !zoomOn && (mouse ? " Drag across the traces or scroll to zoom time; double-click to reset." : " Pinch to zoom time, drag to pan, double-tap to reset.")}
-              {stepping && mouse && !zoomOn && "The arrow keys, or a presentation clicker, step too."}
-              {zoomOn && (
-                <button className="zoom-reset" onClick={() => (tab === "clamp" ? setClampX(null) : setSpikeX(null))}>Reset zoom</button>
+          <div className="caption">
+            <span className="cap-text" aria-live="polite">
+              {reading ? <b className="reading">{reading}</b> : (
+                <>
+                  {!stepping && (tab === "clamp" ? "Ideal clamp, no electrode: what no rig records." : "The membrane alone, no electrode.")}
+                  {!stepping && (tab === "spike" || !iv) && !zoomOn && (mouse ? " Drag across the traces or scroll to zoom time; double-click to reset." : " Pinch to zoom time, drag to pan, double-tap to reset.")}
+                  {stepping && mouse && !zoomOn && "The arrow keys, or a presentation clicker, step too."}
+                </>
               )}
-            </p>
-          )}
+            </span>
+            {zoomOn && (
+              <button className="zoom-reset" onClick={() => (tab === "clamp" ? setClampX(null) : setSpikeX(null))}>Reset zoom</button>
+            )}
+            {(tab === "spike" || !iv) && (
+              <button className={`measure-btn${measure ? " on" : ""}`} aria-pressed={measure} aria-label="measuring cursor" onClick={toggleMeasure}>Cursor</button>
+            )}
+          </div>
         </section>
       </main>
 

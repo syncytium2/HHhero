@@ -160,3 +160,26 @@ the last step and the step spacing as well as the hold and step length. The
 first step is kept at or below the last, so the family always has at least
 one sweep. The clamp slider is called "step spacing" so that it differs from
 the "step size" of your own pulse ladder.
+
+## 2026-10-31: a measuring cursor on the traces; INa and IK together
+
+The owner asked whether a cursor measurement could live on the traces
+without interfering with zoom, then: "Build it with a toggle to disable, off
+by default." The Cursor button in the caption row turns it on. The gestures
+split by movement: a tap or click that barely moves (under 8 px) places the
+cursor, a press within 22 px of the cursor line drags it, and every other
+gesture zooms and pans as before. The tap also reports the height tapped, so
+on a clamp family it picks the sweep drawn nearest the tap; that sweep is
+bolded and labeled, and in step mode the cursor reads the current step. One
+cursor per experiment, shared by every plot on its time axis, like the zoom.
+The reading replaces the caption text, so it costs no height on a phone.
+
+A double-tap (or double-click) now has to be two quick presses in the same
+place (within 30 px). Before, any two presses within 300 ms reset the zoom,
+which would have fired while measuring at two places in quick succession.
+
+Also: "Enable showing both na and k in vclamp mode (make the buttons toggle
+rather than switch). Separate the iv button", and "Na and k buttons would
+toggle iv plot view too". INa and IK are now colored toggles like m, h and n
+(at least one stays on). They choose the currents on the traces and on the
+I–V alike; I–V is its own on/off button beside them.
