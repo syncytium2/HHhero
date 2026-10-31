@@ -11,6 +11,9 @@ in `src/core/hh.test.ts`; the methods page (#hh-paper) shows the comparison.
 
 The paper's V is the displacement of the membrane potential from rest, **depolarization negative** (p. 505). The
 port's Vm (mV, depolarization positive, rest −65 mV) is Vm = −(V + 65); equilibrium potentials likewise E = −V − 65.
+Current, p. 505 (under eqn. 1): "I is the total membrane current density (inward current positive); Ii is the ionic
+current density (inward current positive)". From Fig. 12 on, figures plot −V upward ("depolarizations (or negative
+displacements of V) are plotted upwards", Fig. 12 legend, p. 525). The 1952 screen follows all three.
 
 ## The rate functions (p. 519; first given on pp. 510, 515, 516), in 1/ms at 6.3 °C
 
@@ -67,3 +70,34 @@ Tables 1 and 2), not predictions of the final model, so the port does not compar
 instead that voltage clamp on the port reproduces the paper's clamped-step solution, Eqs. 8, 17 and 18.
 
 Anode break mechanism (p. 537): "anodal polarization decreases the potassium conductance and removes inactivation."
+
+## What the 1952 screen takes (src/paper/paper1952.ts, checked in paper1952.test.ts)
+
+**Table 1 (p. 510), "Analysis of curves in Fig. 3"**, axon 17, gK0 = 0.24 m.mho/cm² (Fig. 3 legend):
+
+| curve | V (mV) | final gK (m.mho/cm²) | τn (ms) |
+|---|---|---|---|
+| A | −109 | 20.70 | 1.05 |
+| B | −100 | 20.00 | 1.10 |
+| C | −88 | 18.60 | 1.25 |
+| D | −76 | 17.00 | 1.50 |
+| E | −63 | 15.30 | 1.70 |
+| F | −51 | 13.27 | 2.05 |
+| G | −38 | 10.29 | 2.60 |
+| H | −32 | 8.62 | 3.20 |
+| I | −26 | 6.84 | 3.80 |
+| J | −19 | 5.00 | 4.50 |
+| K | −10 | 1.47 | 5.25 |
+| L | −6 | 0.98 | 5.25 |
+
+With eqn. (11), gK = {gK∞^¼ − (gK∞^¼ − gK0^¼) exp(−t/τn)}⁴ (p. 508), these redraw the paper's smooth curves; drawn
+over the scan they land on the printed lines (the tracing's review image).
+
+**Fig. 3 (p. 508), the measured points**: traced from the archive scan by `tools/trace/hh1952_fig3.py` into
+`src/paper/hh1952_fig3.json`, 10 to 13 points per curve. Read off a printed figure, so they carry its drawing
+error; the mean distance of each curve's points from its eqn. (11) curve is 0.04 to 0.52 m.mho/cm². A circle the
+line runs through can be missed (one on B near 0.7 ms is).
+
+**Fig. 12 (p. 525)**: initial depolarizations of 90, 15, 7 and 6 mV at 6 °C; 7 fires, 6 does not; peaks near
+0.3, 1.2 and 3.5 ms. **Table 4 (p. 527)** above, rows at 6.3 °C. **Fig. 19 (p. 532)**: 15 mV at 6 °C, gK and h,
+"Both curves reach their normal levels again near the end of the positive phase".

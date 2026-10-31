@@ -258,3 +258,45 @@ The required link back to tonydefazio.com, without the usual arrow (the
 owner finds it confusing) and without using vertical space: small, under
 the HHhero name in the header, which is already as tall as its buttons; and
 in About, "By Tony DeFazio".
+
+## 2026-10-31: the 1952 screen
+
+The owner: "a retro mode with green phosphor like old school mode in gaba
+excites ... use the original conventions (with a toggle) and enable a student
+to recreate each of the original experiments", by a guided walk ending on the
+paper's figure or by being asked to recreate a figure. Advice first, then:
+"start with the model paper ... Tracing is fine ... Focus on laptop mode."
+
+What was built. A separate screen (`src/ui/Retro.tsx`, the **1952** button on
+wide screens, or `#1952`) so nothing changes under students on the main app.
+gaba_excites' Old school palette, the traces in phosphor green with a glow.
+A sign toggle: the paper's V (displacement from rest, depolarization
+negative) and current (inward positive), both stated on p. 505, and −V
+plotted upward as the paper does from Fig. 12 on; or modern. A rig with two
+drives, the paper's own: a voltage-clamp step, and a "shock" (V displaced
+suddenly with the gates at rest, eqn. 26 with no current, p. 522). Steps are
+kept as depolarizations, the paper's words, so only display and typing
+follow the toggle. Three figures: Fig. 3 (gK families), Fig. 12 (membrane
+action potentials), Fig. 19 (gK and h after the spike). Guided walks set the
+rig a step at a time; challenges describe the figure and check the rig, and
+when met, show the paper's data over the student's.
+
+The paper's data. Fig. 3's smooth curves are not traced: Table 1 gives each
+curve's final gK and τn, and eqn. (11) redraws them exactly (drawn over the
+scan they land on the printed lines, which also proves the tracing's
+calibration). Its circles are traced (`tools/trace/hh1952_fig3.py`, the
+armory/no_peak method: calibrate from tick marks, find circles as enclosed
+white holes, keep a review overlay out of git). Holes in printed digits
+("88", "38", "6") were first read as points; the overlay caught them. The
+PDF is the 2006 archive scan, the copy PubMed Central serves free, from the
+owner's Dropbox lit folder; unlike Webster 1991 in no_peak, no subscription
+terms attach to it. Fig. 12 needs no tracing for its upper family: those
+are the paper's calculations, and the model reproduces them (Table 4's
+heights to 0.1 mV, 7 mV fires and 6 does not); its recorded lower family is
+on the roadmap.
+
+What the model and axon 17 disagree on, said in the guide rather than
+hidden: the model's ḡK is Table 3's standard axon, so its large-step gK
+curves sit above axon 17's points. A first draft said gK "starts flat"; at
+rest n is already 0.32, so the test showed a milder S (the first 0.1 ms at
+about half the steepest rate) and the text now says "slowly, then faster".

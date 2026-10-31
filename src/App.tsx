@@ -11,6 +11,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Plot, type Series } from "./ui/Plot.tsx";
 import { Slider } from "./ui/Slider.tsx";
 import { Tour, tour } from "./ui/Tour.tsx";
+import { Retro } from "./ui/Retro.tsx";
 import { clampView, isFull, type Range } from "./ui/zoom.ts";
 import {
   fmt, GATE_IDS, infEdited, NO_EDIT, rateEdited, rateFormula, STOCK_RATES, stockGate, tauEdited,
@@ -105,7 +106,23 @@ function spike(md: Model, stim: Stimulus) {
   return freeRun(md, stim, st, DT, 5);
 }
 
+/** The app, or the 1952 screen when the address ends in #1952 (so it can be linked to). */
 export function App() {
+  const [retro, setRetro] = useState(() => typeof location !== "undefined" && location.hash === "#1952");
+  useEffect(() => {
+    const f = () => setRetro(location.hash === "#1952");
+    addEventListener("hashchange", f);
+    return () => removeEventListener("hashchange", f);
+  }, []);
+  const go = (on: boolean) => {
+    if (on) location.hash = "1952";
+    else history.pushState(null, "", location.pathname + location.search);
+    setRetro(on);
+  };
+  return retro ? <Retro onExit={() => go(false)} /> : <Main onRetro={() => go(true)} />;
+}
+
+function Main({ onRetro }: { onRetro: () => void }) {
   const [p, setP] = useState<Params>(stockParams);
   const [view, setView] = useState<View>("ab");
   const [sel, setSel] = useState<Sel>("m");
@@ -725,6 +742,10 @@ export function App() {
           <a className="home-link" href="https://tonydefazio.com/">tonydefazio.com</a>
         </div>
         <button className="tour-btn" aria-label="quick tour" onClick={() => setTouring(true)} disabled={touring}>Tour</button>
+        {wide && (
+          <button className="r-enter" onClick={onRetro}
+            {...tour("1952", "Re-run figures from Hodgkin and Huxley's model paper, on a green-phosphor screen, in the paper's own signs.")}>1952</button>
+        )}
         <div className="switch" role="radiogroup" aria-label="formulation">
           <button role="radio" aria-checked={view === "ab"} className={view === "ab" ? "on" : ""} onClick={() => setView("ab")}
             {...tour("α, β", "Each gate as Hodgkin and Huxley wrote it: α, how fast it opens, and β, how fast it closes.")}>α, β</button>

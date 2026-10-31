@@ -4,12 +4,25 @@ The first version does one thing: the α, β ⇄ x∞, τ switch. The owner,
 2026-10-30: "all of these are teachable moments. probably too much to cover it
 all ... the rest keep in mind once we get a reviewable tool live." Kept in mind:
 
-- **The 1952 sign convention.** A switch that redraws every axis and equation
-  as the paper prints them: V as the displacement from rest, depolarization
-  negative, V_Na −115, V_K +12 mV. Before showing a current in the paper's
-  sign, check the paper's sign of current on p. 505 and add it to
-  `lit/notes/hodgkin1952.md` (from Eq. 26 with V_Na = −115, inward current
-  comes out positive; confirm it on the page).
+- **The 1952 screen: more of the model paper.** Built 2026-10-31 with
+  Figs. 3, 12 and 19 (laptop first). Next from the same paper, each a guided
+  walk plus a challenge, traced data where the figure has measurements:
+  Fig. 6 (gNa families, axon 17; Table 2 gives the fitted curves, the circles
+  need tracing as Fig. 3's were); Figs. 4, 5, 7, 8, 9, 10 (the rate constants
+  and n∞, h∞ against V: points over the curves card); Fig. 11 (computed and
+  recorded clamp currents at 4 °C: needs the total current); the recorded
+  lower family of Fig. 12 (tracings of lines, not circles); Fig. 13 (9.1 °C
+  record); Fig. 20 (refractory period: needs a second shock); Fig. 21
+  (threshold, near-threshold responses); Fig. 22 (anode break: release from
+  30 mV below rest); Figs. 23 and 24 (small oscillations). Then the phone
+  layout.
+- **The rest of the 1952 series**, the owner's to-do list (2026-10-31): Hodgkin,
+  Huxley & Katz 1952 (the clamp itself, J Physiol 116:424) and Hodgkin &
+  Huxley 1952a–c (116:449, 116:473, 116:497: the ionic currents separated,
+  the potassium and sodium conductances, inactivation). These are where the
+  experiments are; the model paper mostly computes. Each figure the model can
+  reach becomes an entry in `src/paper/`, with its claims tested. PDFs are in
+  the owner's Dropbox lit folder.
 - **How Hodgkin and Huxley fitted it.** The paper's fitted points (Tables 1 and
   2 for axon 17; check what they print, transcribe with pages) on the α and β
   plots, and students drag the constants to fit them. Printed values first;

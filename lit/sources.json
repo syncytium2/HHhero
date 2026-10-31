@@ -19,12 +19,17 @@
       "pmcid": "PMC1392413",
       "access": "open",
       "role": "model",
-      "took": "The squid giant axon: INa = gNa m³h (V − ENa), IK = gK n⁴ (V − EK), the rate functions (Eqs. 12, 13, 20, 21, 23, 24, p. 519) and the three forms they take, the constants of Table 3 (p. 520), and the Q10 of 3 from 6.3 °C. All checked against the port in src/core/hh.test.ts.",
+      "took": "The squid giant axon: INa = gNa m³h (V − ENa), IK = gK n⁴ (V − EK), the rate functions (Eqs. 12, 13, 20, 21, 23, 24, p. 519) and the three forms they take, the constants of Table 3 (p. 520), and the Q10 of 3 from 6.3 °C. All checked against the port in src/core/hh.test.ts. For the 1952 screen: the sign of V and of current (p. 505), Table 1 (p. 510) and the measured points of Fig. 3 (p. 508, traced), the shocks of Fig. 12 (p. 525), Table 4 (p. 527), and Fig. 19 (p. 532).",
       "usedIn": [
         "src/core/rates.ts",
         "src/core/model.ts",
         "src/core/hh.test.ts",
-        "src/App.tsx"
+        "src/App.tsx",
+        "src/paper/paper1952.ts",
+        "src/paper/paper1952.test.ts",
+        "src/paper/hh1952_fig3.json",
+        "src/ui/Retro.tsx",
+        "tools/trace/hh1952_fig3.py"
       ],
       "notes": "notes/hodgkin1952.md"
     },

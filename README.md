@@ -29,6 +29,15 @@ New to it? Tour, at the top, walks every control and shows it working, then
 puts everything back. In voltage clamp, Na and K switch each channel on and
 off, g shows conductance instead of current, and I–V (g–V) plots the peaks.
 
+On a laptop, **1952** opens Hodgkin and Huxley's model paper on a
+green-phosphor screen, in the paper's own signs (V from rest, depolarization
+negative, inward current positive) or today's. Each figure is a guided walk,
+step by step, ending on the paper's own data, or a challenge: the figure
+described, and you set up the experiment until it matches. So far Fig. 3
+(potassium conductance, with the measured points traced from the paper),
+Fig. 12 (membrane action potentials, against Table 4) and Fig. 19 (gK and h
+after the spike). The address `#1952` opens it directly.
+
 ## The model
 
 The space-clamped squid axon of Hodgkin & Huxley (1952) J Physiol 117:500–544

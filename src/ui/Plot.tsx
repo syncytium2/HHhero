@@ -24,6 +24,8 @@ export interface Series {
   labelAt?: "end" | "peak";
   /** also mark each point */
   dots?: boolean;
+  /** draw only open circles at the points, no line (measured data) */
+  points?: boolean;
 }
 
 interface Props {
@@ -320,6 +322,12 @@ export function Plot({ height, series: raw, x: full, y, yInclude, xLabel, yLabel
               d += `${pen ? "L" : "M"}${sx(s.x[i]).toFixed(1)} ${clampY(sy(yv)).toFixed(1)}`;
               pen = true;
             }
+            if (s.points)
+              return (
+                <g key={k}>
+                  {Array.from(s.x, (xv, i) => (Number.isFinite(s.y[i]) ? <circle key={i} cx={sx(xv)} cy={clampY(sy(s.y[i]))} r={3.6} style={{ fill: "none", stroke: s.color, strokeWidth: 1.4, opacity: s.opacity ?? 1 }} /> : null))}
+                </g>
+              );
             const line = <path d={d} fill="none" style={{ stroke: s.color, strokeWidth: s.width ?? 1.6, strokeDasharray: s.dash, opacity: s.opacity ?? 1 }} strokeLinejoin="round" />;
             if (!s.dots) return <g key={k}>{line}</g>;
             return (

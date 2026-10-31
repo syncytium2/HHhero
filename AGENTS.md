@@ -28,6 +28,13 @@ between the two. One model, two sets of controls. The core is `src/core/`
 
 ## Rules that are load-bearing
 
+- **The 1952 screen's figures are data plus tested claims.** Each lives in
+  `src/paper/paper1952.ts` (rig, guide text, challenge check); every sentence
+  the guide says about a trace has a test in `paper1952.test.ts`. Points read
+  off a figure come from a script in `tools/trace/` that writes JSON into
+  `src/paper/` and a review image (the trace over the printed figure) to a
+  directory outside the repository: the image embeds the scan, so never
+  commit it. Run the tracers with numpy, pillow, scipy and pymupdf.
 - **Every control gets a tour caption.** The Tour (`src/ui/Tour.tsx`) knows
   no features: it walks whatever carries `{...tour(title, text)}` in page
   order and shows each working (toggles pressed and released, picks chosen

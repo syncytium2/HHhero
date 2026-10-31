@@ -388,6 +388,40 @@ await wide.getByRole("radio", { name: "x∞, τ" }).click();
 await wide.waitForTimeout(150);
 await wide.screenshot({ path: `${out}/wide-it.png` });
 
+// ---------------------------------------------------------------- 1952
+// the model paper's figures: a guided walk ends on the paper's data, a challenge is met by setting the rig
+await wide.getByRole("button", { name: "1952", exact: true }).click();
+await wide.waitForTimeout(300);
+if (!(await wide.locator(".retro").count())) problems.push("1952: the button did not open the 1952 screen");
+await untoured(wide, "1952");
+await noSideways(wide, "1952");
+const rNext = () => wide.getByRole("button", { name: "next step" });
+for (let i = 0; i < 10 && !(await rNext().isDisabled()); i++) await rNext().click();
+await wide.waitForTimeout(150);
+const paperCircles = await wide.locator('svg[aria-label="conductance during the clamp steps"] circle').count();
+if (paperCircles < 100) problems.push(`1952: the last step of Fig. 3 shows ${paperCircles} of the paper's points`);
+await wide.screenshot({ path: `${out}/wide-1952-fig3.png` });
+// Fig. 12 as a challenge, in modern signs: set the shocks and the temperature, and it says so
+await wide.getByRole("button", { name: /Fig\. 12/ }).click();
+await wide.getByRole("radio", { name: "Challenge" }).click();
+await wide.getByRole("radio", { name: "Modern" }).click();
+await wide.getByRole("radio", { name: "Shock" }).click();
+await wide.locator(".r-field input").fill("90, 15, 7, 6");
+await wide.locator(".r-field input").press("Enter");
+for (let i = 0; i < 3; i++) await wide.getByRole("button", { name: "decrease temperature" }).click();
+await wide.waitForTimeout(200);
+const verdict = (await wide.locator(".r-check").textContent()) ?? "";
+if (!verdict.startsWith("✓")) problems.push(`1952: the Fig. 12 challenge was set up and not met ("${verdict}")`);
+if (!(await wide.locator(".t4").count())) problems.push("1952: the met Fig. 12 challenge does not show Table 4");
+if (!(await wide.getByText("V (mV)", { exact: true }).count())) problems.push("1952: modern signs do not label the voltage V (mV)");
+await wide.screenshot({ path: `${out}/wide-1952-fig12-challenge.png` });
+await wide.getByRole("radio", { name: "1952 signs" }).click();
+await wide.waitForTimeout(100);
+if (!(await wide.getByText(/−V \(mV\)/).count())) problems.push("1952: the paper's signs do not plot −V");
+await wide.getByRole("button", { name: "Back to HHhero" }).click();
+await wide.waitForTimeout(200);
+if (await wide.locator(".retro").count()) problems.push("1952: Back did not leave the 1952 screen");
+
 await browser.close();
 if (problems.length) {
   console.error(`${problems.length} problem(s):\n  ` + problems.join("\n  "));
