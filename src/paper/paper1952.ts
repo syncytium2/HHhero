@@ -199,15 +199,15 @@ export const FIGURES: Figure[] = [
       },
       {
         text: "A 90 mV shock: the sodium conductance turns on at once and the spike rises within a fraction of a millisecond.",
-        rig: { steps: [90, 15] },
+        rig: { steps: [90] },
       },
       {
         text: "15 mV: the same spike, later. Below the spike, the membrane sits for about a millisecond while m creeps up.",
-        rig: { steps: [90, 15, 7] },
+        rig: { steps: [90, 15] },
       },
       {
         text: "7 mV: later still, after more than 3 ms, but it fires, and the spike is nearly the same height. All or nothing.",
-        rig: { steps: [90, 15, 7, 6] },
+        rig: { steps: [90, 15, 7] },
       },
       {
         text: "6 mV: no spike. Threshold lies between 6 and 7 mV, as in the paper. These are the paper's own calculations, done by hand; the heights below are its Table 4 against the model here.",
