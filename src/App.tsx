@@ -936,6 +936,11 @@ function Main({ onRetro }: { onRetro: () => void }) {
               change. On a wide screen, the 1952 button re-runs figures from Hodgkin and Huxley's paper itself.
             </p>
             <p>
+              It is designed for a lecture: students on their phones, the lecturer projecting the same page at the front. On a
+              phone, the plot and the control you are moving stay on screen together. On a big screen, Step walks the sweeps
+              one at a time (a presentation clicker steps too), and Focus gives the traces the whole screen.
+            </p>
+            <p>
               <a href="https://gaba.tonydefazio.com">gaba_excites</a>, the site this one grew from, puts channels like these
               into whole neurons with synapses, recorded as a current-clamp rig would, and asks what decides whether, and how
               often, a neuron fires. For the
