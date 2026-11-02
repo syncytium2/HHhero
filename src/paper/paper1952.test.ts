@@ -92,6 +92,14 @@ describe("Fig. 12 and Table 4: membrane action potentials at 6 °C", () => {
     expect(tPeak(15)).toBeLessThan(1.5);
     expect(tPeak(7)).toBeGreaterThan(3);
   });
+  it("each step of the walk that names a shock shows it as the newest, smallest trace, and none smaller", () => {
+    const f = FIGURES.find((x) => x.id === "fig12")!;
+    f.guide.forEach((g, k) => {
+      const m = /^(?:A )?(\d+) mV/.exec(g.text);
+      if (!m) return;
+      expect(Math.min(...guideRig(f, k).steps), `step text: ${g.text.slice(0, 20)}`).toBe(Number(m[1]));
+    });
+  });
 });
 
 describe("Fig. 19: gK and h after the spike", () => {

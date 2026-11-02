@@ -300,3 +300,15 @@ hidden: the model's ḡK is Table 3's standard axon, so its large-step gK
 curves sit above axon 17's points. A first draft said gK "starts flat"; at
 rest n is already 0.32, so the test showed a milder S (the first 0.1 ms at
 about half the steepest rate) and the text now says "slowly, then faster".
+
+Owner review of the 1952 screen, 2026-10-31 (on the Mac, not finished).
+Fig. 12's guided walk ran one shock ahead of its text: "A 90 mV shock"
+showed 90 and 15, and "7 mV" already showed 6. Each step now shows the
+shocks it has named and no more, and a test holds every step that opens
+with a shock size to show that shock as its smallest trace (it fails on
+fedb708). Still open, for the owner to decide: Fig. 3's walk opens on a
+25 mV step, which is not one of the paper's twelve (26 is), and calls the
+model's current "the raw record", though axon 17 was in choline sea water
+and its records had almost no sodium current. The proposal is a 26 mV step
+and the words "the model's current, as an axon in normal sea water would
+give it". The review of Figs. 3, 12 and 19 is otherwise still to do.
