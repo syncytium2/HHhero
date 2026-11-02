@@ -6,7 +6,7 @@ as where it settles (x∞) and how fast it gets there (τ). Flip between the two
 and watch the curves, the voltage-clamp currents and the action potential
 change. Phone first; it also works on a lecture screen.
 
-Live (under review, not indexed): https://hhhero.tonydefazio.com
+Live: https://hhhero.tonydefazio.com
 
 ## The idea
 

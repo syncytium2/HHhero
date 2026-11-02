@@ -314,3 +314,14 @@ HHhero is about (a gate as α, β or as x∞, τ), the 1952 screen, gaba_excites
 for whole neurons, and Bezanilla's The Nerve Impulse for the biophysics.
 The old About (the conversion, the model and its source, the versions)
 follows, with GitHub named in full rather than as "source".
+
+## 2026-11-02: public
+
+The owner: "We should be public." The repository already was; the site
+was kept out of search engines while under review. Now robots.txt allows
+all crawlers, AI ones included (gaba_excites' policy), a sitemap lists the
+one page (the 1952 screen is a hash, #1952, not a page of its own), and the
+noindex header and meta tag are gone. The earlier versions under /v/ keep
+`X-Robots-Tag: noindex`, so a search lands on the current one. Cloudflare's
+managed robots.txt and AI-crawler blocking can override the file; check the
+zone after the deploy, as no_peak's robots.txt describes.

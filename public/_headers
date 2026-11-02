@@ -1,8 +1,7 @@
 # Cloudflare static-asset response headers (copied to dist/ by Vite).
 # no-transform on HTML stops Cloudflare injecting its analytics beacon at the
-# edge (it did, to colonel_kernel). X-Robots-Tag: under review, not indexed.
-/*
-  X-Robots-Tag: noindex, nofollow
+# edge (it did, to colonel_kernel). The site is indexed; the earlier versions
+# under /v/ are not, so a search lands on the current one.
 /
   Cache-Control: public, max-age=0, must-revalidate, no-transform
 /index.html
@@ -10,3 +9,4 @@
 # the earlier versions a user can go back to (scripts/deploy.sh builds them into dist/v/)
 /v/*
   Cache-Control: public, max-age=0, must-revalidate, no-transform
+  X-Robots-Tag: noindex

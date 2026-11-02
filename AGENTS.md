@@ -59,8 +59,9 @@ between the two. One model, two sets of controls. The core is `src/core/`
   injected into the built HTML by `vite.config.ts`.
 - **The Born stamp comes from the root commit.** Never rewrite it; never build
   from a shallow clone.
-- **Under review: not indexed.** `public/robots.txt` disallows all and
-  `_headers` sends `X-Robots-Tag: noindex` until the owner approves.
+- **Public and indexed** (the owner approved it, 2026-11-02): `public/robots.txt`
+  allows all, with `public/sitemap.xml`. The earlier versions under `/v/` stay
+  `noindex` (`_headers`), so a search lands on the current one.
 - **Cite through `lit/sources.json`.** Never commit a PDF (`lit/pdf/` is
   gitignored; this repository is public).
 - **Log the process** in `docs/process.md`: decisions and why.
