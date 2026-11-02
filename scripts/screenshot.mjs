@@ -287,7 +287,7 @@ await phone.getByRole("button", { name: "focus on the traces" }).tap();
 await phone.waitForTimeout(100);
 if (!(await phone.locator(".curves").count())) problems.push("phone: turning Focus off did not bring the curves back");
 
-await phone.getByRole("button", { name: "about" }).tap();
+await phone.getByRole("button", { name: "Why" }).tap();
 await phone.waitForTimeout(100);
 await phone.screenshot({ path: `${out}/phone-about.png` });
 if (!(await phone.getByRole("heading", { name: "Versions" }).count())) problems.push("phone: About has no Versions section");

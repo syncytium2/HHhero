@@ -23,7 +23,7 @@ between the two. One model, two sets of controls. The core is `src/core/`
 - `npm run deploy`: the only way to deploy (on Windows, `bash scripts/deploy.sh`
   from Git Bash). Do not hand-roll `wrangler deploy`.
   It also rebuilds the two previous releases into `dist/v/<version>/`, so
-  users can go back (`scripts/earlier-versions.ts`; About links to them).
+  users can go back (`scripts/earlier-versions.ts`; the Why page links to them).
   Those builds use today's node_modules: a dependency change can break them.
 
 ## Rules that are load-bearing

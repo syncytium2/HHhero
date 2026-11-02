@@ -300,3 +300,17 @@ hidden: the model's ḡK is Table 3's standard axon, so its large-step gK
 curves sit above axon 17's points. A first draft said gK "starts flat"; at
 rest n is already 0.32, so the test showed a milder S (the first 0.1 ms at
 about half the steepest rate) and the text now says "slowly, then faster".
+
+## 2026-11-02: a Why page, for a viewer who arrives knowing nothing
+
+The owner noticed the site had no "what is this" for a naive viewer. The
+header's "?" (About) is now a Why button, and its page opens with the
+owner's introduction to action potentials from gaba_excites (`/explainer`
+there), quoted as written: its first and third paragraphs and its two
+footnotes. The second paragraph, about gaba_excites' own cells (pyramidal,
+interneuron, GnRH), is left out because HHhero has only the squid axon.
+Then "Where this site fits": Hodgkin and Huxley's experiment, the one idea
+HHhero is about (a gate as α, β or as x∞, τ), the 1952 screen, gaba_excites
+for whole neurons, and Bezanilla's The Nerve Impulse for the biophysics.
+The old About (the conversion, the model and its source, the versions)
+follows, with GitHub named in full rather than as "source".

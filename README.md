@@ -25,7 +25,9 @@ and across threshold (your own ladder, if you set one in Protocol). The arrow
 keys and a presentation clicker step too. Focus, under the traces, hides the
 gate curves and gives the traces the screen; the device remembers it.
 
-New to it? Tour, at the top, walks every control and shows it working, then
+New to it? Why, at the top, starts with what an action potential is and says
+where this site fits; it also holds the model's source and the earlier
+versions. Tour, beside it, walks every control and shows it working, then
 puts everything back. In voltage clamp, Na and K switch each channel on and
 off, g shows conductance instead of current, and I–V (g–V) plots the peaks.
 

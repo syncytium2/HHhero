@@ -40,7 +40,7 @@ a { color: inherit; }
 .switch { display: flex; margin-left: auto; border: 1px solid var(--on); border-radius: 10px; overflow: hidden; }
 .switch button { border: 0; border-radius: 0; min-height: 44px; min-width: 76px; font-size: 17px; font-weight: 600; background: var(--card); }
 .switch button.on { background: var(--on); color: var(--on-ink); }
-.about-btn { min-width: 44px; min-height: 44px; border-radius: 22px; font-weight: 700; }
+.why-btn { min-height: 44px; min-width: 44px; padding: 0 10px; font-size: 14px; font-weight: 700; }
 
 .plots { flex: 0 0 auto; padding: 6px 8px 0; display: flex; flex-direction: column; gap: 6px; }
 .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 4px 6px 4px; }
@@ -117,6 +117,8 @@ a { color: inherit; }
 .archived a { font-weight: 600; }
 .about-card h2 { font-size: 17px; margin: 0 0 8px; }
 .about-card p { margin: 0 0 10px; font-size: 14.5px; }
+.about-card .byline { font-size: 13px; color: var(--muted); margin-top: -4px; }
+.about-card .fn { font-size: 13px; color: var(--muted); }
 .about-card .eq { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 13.5px; background: var(--bg); padding: 8px 10px; border-radius: 8px; }
 .about-card button { min-height: 44px; width: 100%; }
 

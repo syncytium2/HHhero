@@ -741,6 +741,8 @@ function Main({ onRetro }: { onRetro: () => void }) {
           <h1>HH<span>hero</span></h1>
           <a className="home-link" href="https://tonydefazio.com/">tonydefazio.com</a>
         </div>
+        <button className="why-btn" onClick={() => setAbout(true)}
+          {...tour("Why", "What an action potential is, where this site fits, the model and its source, and the earlier versions.")}>Why</button>
         <button className="tour-btn" aria-label="quick tour" onClick={() => setTouring(true)} disabled={touring}>Tour</button>
         {wide && (
           <button className="r-enter" onClick={onRetro}
@@ -752,8 +754,6 @@ function Main({ onRetro }: { onRetro: () => void }) {
           <button role="radio" aria-checked={view === "it"} className={view === "it" ? "on" : ""} onClick={() => setView("it")}
             {...tour("x∞, τ", "The same gates as where they settle and how fast they get there. The model doesn't change; what you hold does.")}>x∞, τ</button>
         </div>
-        <button className="about-btn" aria-label="about" onClick={() => setAbout(true)}
-          {...tour("About", "The model, its source, and the earlier versions, if something stops working.")}>?</button>
       </header>
 
       {ARCHIVED && (
@@ -873,25 +873,87 @@ function Main({ onRetro }: { onRetro: () => void }) {
 
       {touring && <Tour onEnd={() => setTouring(false)} />}
       {about && (
-        <div className="about" role="dialog" aria-modal="true" aria-label="about HHhero" onClick={() => setAbout(false)}>
+        <div className="about" role="dialog" aria-modal="true" aria-label="why HHhero" onClick={() => setAbout(false)}>
           <div className="about-card" onClick={(e) => e.stopPropagation()}>
-            <h2>One model, two ways to hold it</h2>
+            <h2>Action potentials</h2>
+            <p className="byline">
+              By Tony DeFazio, from his <a href="https://gaba.tonydefazio.com/explainer">introduction</a> for gaba_excites
+            </p>
             <p>
-              Hodgkin and Huxley wrote each gate as two rates: α, how fast it opens, and β, how fast it closes. Most models
-              since write the same gate as where it settles, x∞, and how fast it gets there, τ. The two are the same thing:
+              Action potentials are the fundamental unit of neuron activity.<sup>*</sup> Your brain is built from neurons,
+              glia<sup>**</sup>, and the connections between them, plus the blood vessels that deliver oxygen and nutrients
+              while taking away waste. When many neurons are active together, their combined electrical activity can be
+              picked up by electrodes on the scalp: that is an EEG (electroencephalogram). Patterns among neurons are
+              necessary for sleep, cognition, and also allow detection of abnormal activity during epileptic seizures and
+              other neurological problems. All of these depend on action potentials.
+            </p>
+            <p>
+              Action potentials are a change in voltage in the neuron. If you stick your finger in an electrical outlet, you
+              get a very strong jolt of electricity. Wires carry electrons and the potential difference between the outlet
+              wires is what powers your cell phone charger, your TV, your lights. In neurons, ions carry the charge. These are
+              sodium, potassium, calcium, and chloride (plus many others, but these are the main ones). Neurons keep the
+              concentration of ions different from the outside: sodium, calcium, and chloride are high outside the cell and
+              low inside, the opposite is true for potassium (an introduction:{" "}
+              <a href="https://openstax.org/books/anatomy-and-physiology-2e/pages/12-4-the-action-potential">
+                OpenStax, <cite>Anatomy and Physiology 2e</cite>, section 12.4
+              </a>
+              ; to watch how cells build and keep these differences:{" "}
+              <a href="https://ionhomie.tonydefazio.com/"><cite>ionhomie</cite></a>). The channels in this story each allow
+              only one type of ion to flow through: sodium channels, potassium channels, etc. The channels that make the
+              action potential have gates that constantly open and close, but the probability of their opening or closing is
+              dependent on the voltage of the cell. Neurons sit at a negative voltage at rest because of the ion gradients and
+              the channels open at rest. When a sodium channel opens, sodium rushes into the cell. Sodium is positively
+              charged, so the inside of the neuron becomes less negative, and briefly positive. Potassium channels open when
+              the neuron becomes less negative. Potassium is also positively charged, but the electrical and concentration
+              gradient drives the potassium out of the cell, making the inside negative again. This interaction between
+              sodium and potassium is how action potentials work. Scientists call “less negative” depolarized and “more
+              negative” hyperpolarized; you’ll see those words in the simulator.
+            </p>
+            <p className="fn">
+              * future projects are planned to address action potential independent activity…
+              <br />
+              ** glia is a name for many other non-neuronal cell types in the brain. These cells have many roles and are
+              crucial for normal brain activity. You can’t build a brain with just neurons.
+            </p>
+
+            <h3>Where this site fits</h3>
+            <p>
+              Those gates were first worked out in 1952, by Alan Hodgkin and Andrew Huxley, in the giant axon of the squid.
+              They held the membrane at one voltage after another, measured the sodium and potassium currents, and wrote
+              equations for how each channel's gates open and close. Put together, with nothing else added, the equations
+              made an action potential. Nearly every model of a neuron since is built the same way.
+            </p>
+            <p>
+              HHhero is about one idea in those equations: how a gate is written. Hodgkin and Huxley wrote each gate as two
+              rates: α, how fast it opens, and β, how fast it closes. Most models since write the same gate as where it
+              settles, x∞, and how fast it gets there, τ. The two are the same thing:
             </p>
             <p className="eq">x∞ = α / (α + β) &nbsp;&nbsp; τ = 1 / (φ(α + β))<br />α = x∞ / τ &nbsp;&nbsp; β = (1 − x∞) / τ</p>
             <p>
               The switch at the top changes which pair you edit, never the model. In the α, β view every constant moves both
               x∞ and τ; in the x∞, τ view you can move one and leave the other. Each view keeps its own edits, and a gate
-              edited in the other view says so.
+              edited in the other view says so. Edit a gate and watch the voltage-clamp currents and the action potential
+              change. On a wide screen, the 1952 button re-runs figures from Hodgkin and Huxley's paper itself.
             </p>
             <p>
-              The model is the space-clamped squid axon of Hodgkin &amp; Huxley (1952) J Physiol 117:500–544,{" "}
+              <a href="https://gaba.tonydefazio.com">gaba_excites</a>, the site this one grew from, puts channels like these
+              into whole neurons with synapses, recorded as a current-clamp rig would, and asks what decides whether, and how
+              often, a neuron fires. For the
+              biophysics, Francisco Bezanilla's <a href="https://nerve.bsd.uchicago.edu/"><cite>The Nerve Impulse</cite></a>{" "}
+              and its simulators are the classic.
+            </p>
+
+            <h3>The model</h3>
+            <p>
+              The space-clamped squid axon of Hodgkin &amp; Huxley (1952) J Physiol 117:500–544,{" "}
               <a href="https://doi.org/10.1113/jphysiol.1952.sp004764">doi:10.1113/jphysiol.1952.sp004764</a>, in the modern
               sign (rest −65 mV, depolarization positive). With nothing edited it is NEURON's built-in hh mechanism: the tests
               hold it to NEURON's spike times on 21 current steps. Everything here is the model alone, with no electrode: what
               no rig can record.
+            </p>
+            <p>
+              The code is open, MIT licensed, on GitHub:{" "}
+              <a href="https://github.com/syncytium2/HHhero">github.com/syncytium2/HHhero</a>.
             </p>
             <h3>Versions</h3>
             <p className="versions">
@@ -915,8 +977,7 @@ function Main({ onRetro }: { onRetro: () => void }) {
             </p>
             <p className="muted">
               HHhero v{VERSION} · born {BORN.slice(0, 10)} ·{" "}
-              <a href="https://github.com/syncytium2/HHhero">source</a> · from{" "}
-              <a href="https://gaba.tonydefazio.com">gaba_excites</a>
+              <a href="https://github.com/syncytium2/HHhero">GitHub</a>
             </p>
             <p className="muted">By <a href="https://tonydefazio.com/">Tony DeFazio</a>, tonydefazio.com</p>
             <button onClick={() => setAbout(false)}>Close</button>
