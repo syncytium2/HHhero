@@ -336,3 +336,12 @@ noindex header and meta tag are gone. The earlier versions under /v/ keep
 `X-Robots-Tag: noindex`, so a search lands on the current one. Cloudflare's
 managed robots.txt and AI-crawler blocking can override the file; check the
 zone after the deploy, as no_peak's robots.txt describes.
+
+## 2026-11-02: the 1952 screen hidden for the deploy
+
+The owner asked to deploy before finishing the 1952 review. Live was v0.1.9,
+without the 1952 screen, and this deploy also opens the site to search
+engines, so the owner chose to hide it: `SHOW_1952 = false` removes the
+header button and the Why page's sentence about it. `#1952` still opens the
+screen, unlinked, so the owner can review it on the live site. The
+screenshot check opens it by that address when there is no button.

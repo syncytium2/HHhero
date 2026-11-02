@@ -31,7 +31,9 @@ versions. Tour, beside it, walks every control and shows it working, then
 puts everything back. In voltage clamp, Na and K switch each channel on and
 off, g shows conductance instead of current, and I–V (g–V) plots the peaks.
 
-On a laptop, **1952** opens Hodgkin and Huxley's model paper on a
+While it is under review, nothing links to the 1952 screen (`SHOW_1952` in
+`src/App.tsx`); `#1952` still opens it. When shown, on a laptop, **1952**
+opens Hodgkin and Huxley's model paper on a
 green-phosphor screen, in the paper's own signs (V from rest, depolarization
 negative, inward current positive) or today's. Each figure is a guided walk,
 step by step, ending on the paper's own data, or a challenge: the figure

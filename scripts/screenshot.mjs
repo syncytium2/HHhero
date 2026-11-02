@@ -390,7 +390,10 @@ await wide.screenshot({ path: `${out}/wide-it.png` });
 
 // ---------------------------------------------------------------- 1952
 // the model paper's figures: a guided walk ends on the paper's data, a challenge is met by setting the rig
-await wide.getByRole("button", { name: "1952", exact: true }).click();
+// while it is under review (SHOW_1952 in src/App.tsx) there is no button: open it by its address
+const b1952 = wide.getByRole("button", { name: "1952", exact: true });
+if (await b1952.count()) await b1952.click();
+else await wide.evaluate(() => { location.hash = "1952"; });
 await wide.waitForTimeout(300);
 if (!(await wide.locator(".retro").count())) problems.push("1952: the button did not open the 1952 screen");
 await untoured(wide, "1952");

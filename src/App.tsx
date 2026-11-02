@@ -106,6 +106,12 @@ function spike(md: Model, stim: Stimulus) {
   return freeRun(md, stim, st, DT, 5);
 }
 
+/**
+ * The 1952 screen is under the owner's review: it opens at #1952, but nothing
+ * links to it until this is true.
+ */
+export const SHOW_1952 = false;
+
 /** The app, or the 1952 screen when the address ends in #1952 (so it can be linked to). */
 export function App() {
   const [retro, setRetro] = useState(() => typeof location !== "undefined" && location.hash === "#1952");
@@ -744,7 +750,7 @@ function Main({ onRetro }: { onRetro: () => void }) {
         <button className="why-btn" onClick={() => setAbout(true)}
           {...tour("Why", "What an action potential is, where this site fits, the model and its source, and the earlier versions.")}>Why</button>
         <button className="tour-btn" aria-label="quick tour" onClick={() => setTouring(true)} disabled={touring}>Tour</button>
-        {wide && (
+        {wide && SHOW_1952 && (
           <button className="r-enter" onClick={onRetro}
             {...tour("1952", "Re-run figures from Hodgkin and Huxley's model paper, on a green-phosphor screen, in the paper's own signs.")}>1952</button>
         )}
@@ -933,7 +939,7 @@ function Main({ onRetro }: { onRetro: () => void }) {
               The switch at the top changes which pair you edit, never the model. In the α, β view every constant moves both
               x∞ and τ; in the x∞, τ view you can move one and leave the other. Each view keeps its own edits, and a gate
               edited in the other view says so. Edit a gate and watch the voltage-clamp currents and the action potential
-              change. On a wide screen, the 1952 button re-runs figures from Hodgkin and Huxley's paper itself.
+              change.{SHOW_1952 && " On a wide screen, the 1952 button re-runs figures from Hodgkin and Huxley's paper itself."}
             </p>
             <p>
               It is designed for a lecture: students on their phones, the lecturer projecting the same page at the front. On a
