@@ -282,9 +282,11 @@ function Main({ onRetro }: { onRetro: () => void }) {
   // in focus the traces take the height the curves card gave up
   // (on a wide screen, the window's height, less the stepper's row when it is showing)
   const stepH = stepping ? 60 : 0;
+  // a banner (the dev site's one line, an earlier version's two) takes its height from the traces in Focus on a phone
+  const bannerH = wide ? 0 : DEV_SITE ? 24 : ARCHIVED ? 52 : 0;
   const H = wide
     ? focus ? { curve: 260, strip: 90, sim: Math.max(280, winH - 270 - stepH), v: Math.max(170, (winH - 260 - stepH) / 2), sim2: Math.max(180, (winH - 260 - stepH) / 2) } : { curve: 260, strip: 72, sim: 280, v: 170, sim2: 180 }
-    : focus ? { curve: 132, strip: 60, sim: 320, v: 150, sim2: 190 } : { curve: 132, strip: 46, sim: 124, v: 64, sim2: 80 };
+    : focus ? { curve: 132, strip: 60, sim: 320 - bannerH, v: 150 - bannerH / 2, sim2: 190 - bannerH / 2 } : { curve: 132, strip: 46, sim: 124, v: 64, sim2: 80 };
 
   // ------------------------------------------------------------ curves
   const one = shown.length === 1;

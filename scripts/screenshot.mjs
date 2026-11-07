@@ -35,6 +35,19 @@ const phone = await open({ viewport: { width: 360, height: 740 }, deviceScaleFac
 await phone.screenshot({ path: `${out}/phone-ab.png` });
 await noSideways(phone, "phone");
 
+// a banner (an earlier version, or the dev site) is never squeezed: on a short screen the page's column once cut its text in half
+const bannerWhole = async (page, where) => {
+  const b = await page.evaluate(() => { const e = document.querySelector(".archived"); return e && { h: e.clientHeight, need: e.scrollHeight }; });
+  if (b && b.h < b.need) problems.push(`${where}: the banner is squeezed (${b.h} px of ${b.need})`);
+};
+await bannerWhole(phone, "phone");
+{
+  const short = await open({ viewport: { width: 393, height: 560 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true, colorScheme: "dark" });
+  await bannerWhole(short, "short phone");
+  await short.screenshot({ path: `${out}/phone-short-dark.png` });
+  await short.context().close();
+}
+
 // plots and controls visible together
 const vis = await phone.evaluate(() => {
   const r = (s) => document.querySelector(s)?.getBoundingClientRect();
