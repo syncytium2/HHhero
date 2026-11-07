@@ -1,0 +1,14 @@
+{
+  // The dev site: a second worker, for the owner to review a branch before a
+  // release. Deployed only by `npm run deploy:dev` (scripts/deploy.sh --dev).
+  // Its own name and no routes, so nothing here can reach hhhero.tonydefazio.com
+  // or the live worker. Served at hhhero-dev.tonydefazio.workers.dev, noindex
+  // (the deploy rewrites robots.txt and _headers for it).
+  "name": "hhhero-dev",
+  "compatibility_date": "2026-09-01",
+  "workers_dev": true,
+  "preview_urls": false,
+  "assets": {
+    "directory": "./dist"
+  }
+}

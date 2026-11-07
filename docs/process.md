@@ -383,3 +383,27 @@ are unchanged to the bit (checked against the previous `clampFamily`).
 One change to the step family's g–V: peak gNa is now read in the step
 alone. It was the largest over the whole sweep, so a step below the holding
 potential showed the hold's gNa as its peak.
+## 2026-11-07: a dev site, for review before a release
+
+Students in Les Satin's ephys class are using the live site; the owner: "we
+must not interfere", then asked for "a second dev website so I can review
+before deploy". Built: `npm run deploy:dev` (scripts/deploy.sh --dev)
+deploys the checked-out branch to a second worker, hhhero-dev, at
+hhhero-dev.tonydefazio.workers.dev. It has its own config,
+`wrangler.dev.jsonc`, with its own name and no routes, so it cannot reach
+the live worker or hhhero.tonydefazio.com. No version bump, no Release
+commit, no earlier versions, nothing written to DEPLOYED.md. The page says
+"Dev preview of <branch> @ <commit>, for review: not the live site", and
+asks not to be indexed three ways (meta tag, X-Robots-Tag on every path,
+robots.txt Disallow), so a student's search cannot land on it. Anyone with
+the link can open it; Cloudflare Access could put a login in front, set up
+in the dashboard if wanted.
+
+The banner is one line, so on a phone the plots and controls stay where
+they are. On a wide screen a banner used to land in the page grid's body
+row and push the content out of place; the earlier-version banner on /v/
+had the same fault. A banner now gets a row of its own.
+
+Considered and set aside: Cloudflare's preview URLs on the live worker
+(`preview_urls` is on). They avoid going live too, but every upload gets a
+new address, awkward to bookmark or send to a reviewer.
