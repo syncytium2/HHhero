@@ -345,3 +345,23 @@ engines, so the owner chose to hide it: `SHOW_1952 = false` removes the
 header button and the Why page's sentence about it. `#1952` still opens the
 screen, unlinked, so the owner can review it on the live site. The
 screenshot check opens it by that address when there is no button.
+
+## 2026-11-07: a dev site, for review before a release
+
+Students in Les Satin's ephys class are using the live site; the owner: "we
+must not interfere", then asked for "a second dev website so I can review
+before deploy". Built: `npm run deploy:dev` (scripts/deploy.sh --dev)
+deploys the checked-out branch to a second worker, hhhero-dev, at
+hhhero-dev.tonydefazio.workers.dev. It has its own config,
+`wrangler.dev.jsonc`, with its own name and no routes, so it cannot reach
+the live worker or hhhero.tonydefazio.com. No version bump, no Release
+commit, no earlier versions, nothing written to DEPLOYED.md. The page says
+"Dev preview of <branch> @ <commit>, for review: not the live site", and
+asks not to be indexed three ways (meta tag, X-Robots-Tag on every path,
+robots.txt Disallow), so a student's search cannot land on it. Anyone with
+the link can open it; Cloudflare Access could put a login in front, set up
+in the dashboard if wanted.
+
+Considered and set aside: Cloudflare's preview URLs on the live worker
+(`preview_urls` is on). They avoid going live too, but every upload gets a
+new address, awkward to bookmark or send to a reviewer.

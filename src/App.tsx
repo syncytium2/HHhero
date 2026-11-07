@@ -23,7 +23,7 @@ import {
   type ClampProtocol, type ClampSweep, type Stimulus,
 } from "./core/sim.ts";
 import { noteFor, type View } from "./core/notes.ts";
-import { ARCHIVED, BORN, EARLIER, VERSION } from "./version.ts";
+import { ARCHIVED, BORN, DEV_SITE, EARLIER, VERSION } from "./version.ts";
 
 type Sel = GateId | "na" | "k" | "mem" | "proto";
 type SimTab = "clamp" | "spike";
@@ -762,6 +762,11 @@ function Main({ onRetro }: { onRetro: () => void }) {
         </div>
       </header>
 
+      {DEV_SITE && (
+        <p className="archived">
+          Dev preview of {DEV_SITE}, for review: not the live site. <a href="https://hhhero.tonydefazio.com/">Go to HHhero</a>
+        </p>
+      )}
       {ARCHIVED && (
         <p className="archived">
           You are using an earlier version, v{VERSION}. <a href="/">Back to the current version</a>

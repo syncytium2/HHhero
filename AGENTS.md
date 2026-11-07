@@ -25,6 +25,12 @@ between the two. One model, two sets of controls. The core is `src/core/`
   It also rebuilds the two previous releases into `dist/v/<version>/`, so
   users can go back (`scripts/earlier-versions.ts`; the Why page links to them).
   Those builds use today's node_modules: a dependency change can break them.
+- `npm run deploy:dev`: the dev site, hhhero-dev.tonydefazio.workers.dev, a
+  separate worker (`wrangler.dev.jsonc`) for the owner to review a branch
+  before a release. Any branch, clean tree; no version bump, no DEPLOYED.md,
+  noindex, a "Dev preview" banner. It cannot reach the live site. While a
+  class is using the live site, features go to a branch and the dev site;
+  `main` stays what is live.
 
 ## Rules that are load-bearing
 
