@@ -194,12 +194,13 @@ await phone.getByRole("button", { name: "Action potential" }).tap();
 await phone.waitForTimeout(200);
 await phone.screenshot({ path: `${out}/phone-spike.png` });
 if (!(await phone.locator('svg[aria-label="current pulse protocol"]').count())) problems.push("phone: no protocol strip on the action potential");
-// the simulation header is one row on a phone, in both experiments
+// the action potential's header is one row on a phone
 const headRows = async () => phone.evaluate(() => { const h = document.querySelector(".sim .card-head"); const tops = new Set([...h.querySelectorAll("button")].map((b) => Math.round(b.getBoundingClientRect().top))); return tops.size; });
 if ((await headRows()) !== 1) problems.push("phone: the action potential header wraps");
 await phone.getByRole("button", { name: "Voltage clamp" }).tap();
 await phone.waitForTimeout(100);
-if ((await headRows()) !== 1) problems.push("phone: the voltage clamp header wraps");
+// the clamp header is two rows on a phone, by design: the tabs, then the protocol switch and the trace buttons
+if ((await headRows()) !== 2) problems.push(`phone: the voltage clamp header is ${await headRows()} rows, not 2`);
 await phone.getByRole("button", { name: "Spike (action potential)" }).tap();
 await phone.waitForTimeout(100);
 await pinch('svg[aria-label="membrane potential"]');
@@ -303,7 +304,7 @@ if (!(await phone.locator(".curves").count())) problems.push("phone: turning Foc
 // inactivation: prepulses then one test step; h–V plots the peak at the test step against the prepulse, over h∞
 await phone.getByRole("button", { name: "Voltage clamp" }).tap();
 await phone.locator(".chips").getByRole("tab", { name: "Protocol", exact: true }).tap();
-await phone.getByRole("radio", { name: "Inactivation" }).tap();
+await phone.getByRole("radio", { name: "inactivation protocol" }).tap();
 await phone.waitForTimeout(150);
 await phone.screenshot({ path: `${out}/phone-inact.png` });
 if (!(await phone.getByText(/prepulses [-−]125 to [-−]25 by 10, then test 0/).count())) problems.push("phone: the inactivation protocol strip does not say its prepulses and test step");
@@ -326,7 +327,7 @@ if (!(await phone.locator('svg[aria-label="steady-state inactivation"] text', { 
 if (!(await phone.getByText(/no inactivation gate/).count())) problems.push("phone: h–V with K has no potassium note");
 await phone.getByRole("button", { name: "potassium" }).tap();
 await phone.getByRole("button", { name: "h–V" }).tap();
-await phone.getByRole("radio", { name: "Steps" }).tap();
+await phone.getByRole("radio", { name: "activation protocol", exact: true }).tap();
 await phone.waitForTimeout(80);
 if (!(await phone.getByRole("button", { name: "I–V" }).count())) problems.push("phone: back on Steps, the I–V button did not come back");
 

@@ -54,6 +54,13 @@ a { color: inherit; }
 .tabs button { min-height: 36px; font-size: 13px; }
 .tabs.small { margin-left: auto; }
 .tabs.small button { min-width: 44px; }
+/* the clamp protocol: a joined switch, like the formulation switch, so it does not read as a third tab */
+.proto-pick { gap: 0; border: 1px solid var(--on); border-radius: 8px; overflow: hidden; }
+.proto-pick button { min-width: 48px; border: 0; border-radius: 0; background: var(--card); }
+.proto-pick button.on { background: var(--on); color: var(--on-ink); }
+/* on a phone the clamp header is two rows, always: the tabs, then the protocol and the trace buttons */
+.row-break { display: none; }
+.app:not(.wide) .row-break { display: block; flex-basis: 100%; height: 0; }
 .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; }
 .plot { width: 100%; min-width: 0; position: relative; }
 .step-btn { min-width: 44px; min-height: 36px; font-size: 13px; padding: 0 8px; }

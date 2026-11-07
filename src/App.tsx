@@ -755,12 +755,6 @@ function Main({ onRetro }: { onRetro: () => void }) {
             </>
           )}
           <Slider label={inact ? "test length" : "step length"} unit="ms" value={clamp.dur} min={2} max={50} step={1} stock={clampStock.dur} onChange={(v) => setClamp({ ...clamp, dur: v })} />
-          <div className="ladder-pick" role="radiogroup" aria-label="voltage-clamp protocol">
-            <button role="radio" aria-checked={!inact} className={!inact ? "on" : ""} onClick={() => pickProtocol(false)}
-              {...tour("Steps", "A family of steps from one holding potential: sodium turns on, then off, and potassium turns on.", { kind: "pick" })}>Steps</button>
-            <button role="radio" aria-checked={inact} className={inact ? "on" : ""} onClick={() => pickProtocol(true)}
-              {...tour("Inactivation", "Hold each sweep at a different prepulse, then step all to one test potential. The sodium current left to flow shows how many channels the prepulse inactivated: the h–V button plots it.", { kind: "pick" })}>Inactivation</button>
-          </div>
         </fieldset>
         <fieldset className="group">
           <legend className="formula">Action potential: a current pulse at {fmt(stim.start)} ms</legend>
@@ -872,6 +866,16 @@ function Main({ onRetro }: { onRetro: () => void }) {
             </span>
             <button className={`step-btn${stepping ? " on" : ""}`} aria-pressed={stepping} aria-label="step through" onClick={toggleStepping}
               {...tour("Step", "One sweep at a time, for teaching from the front of a room: the clamp family, or pulses up to threshold and across it. The arrow keys and a presentation clicker step too.", { then: "next step" })}>Step</button>
+            {tab === "clamp" && <span className="row-break" aria-hidden="true" />}
+            {tab === "clamp" && (
+              // the clamp protocol, one tap from the traces; onset of inactivation and recovery will join these
+              <span className="tabs proto-pick" role="radiogroup" aria-label="voltage-clamp protocol">
+                <button role="radio" aria-checked={!inact} aria-label="activation protocol" className={!inact ? "on" : ""} onClick={() => pickProtocol(false)}
+                  {...tour("Act", "Activation: a family of steps from one holding potential. Sodium turns on, then off; potassium turns on.", { kind: "pick" })}>{wide ? "Activation" : "Act"}</button>
+                <button role="radio" aria-checked={inact} aria-label="inactivation protocol" className={inact ? "on" : ""} onClick={() => pickProtocol(true)}
+                  {...tour("Inact", "Inactivation: each sweep a different prepulse, then all step to one test potential. The sodium current left shows how many channels the prepulse inactivated; h–V plots it. Its settings are under Protocol.", { kind: "pick" })}>{wide ? "Inactivation" : "Inact"}</button>
+              </span>
+            )}
             <span className="tabs small">
               {tab === "clamp"
                 ? (

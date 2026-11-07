@@ -420,3 +420,19 @@ had the same fault. A banner now gets a row of its own.
 Considered and set aside: Cloudflare's preview URLs on the live worker
 (`preview_urls` is on). They avoid going live too, but every upload gets a
 new address, awkward to bookmark or send to a reviewer.
+
+## 2026-11-07: the clamp protocol switch, one tap from the traces
+
+The owner: "In vc mode need an easy access switch to act/inact. Note that
+we'll add time dependent inact and recovery eventually." The pick moved
+from the Protocol panel to the voltage-clamp card's header, a joined
+switch (Act | Inact; Activation | Inactivation on a wide screen) drawn like
+the formulation switch so it does not read as a third tab. The Protocol
+panel keeps the sliders for whichever protocol is on. On a phone the clamp
+header is now two rows by design (the tabs; then the switch and Na, K, g,
+I–V), and the screenshot check holds it to two. It had wrapped at 360 px
+for a while, unplanned, and the check had been failing on it.
+
+Room: the second row on a 360 px phone has space for about one more short
+segment. Onset of inactivation and recovery make four protocols; when they
+come, the switch needs its own row or shorter names.
