@@ -38,7 +38,10 @@ export function hInfLabel(ph: number): string {
   return ph === 1 ? "h∞" : `h∞${String(ph).split("").map((d) => sup[+d]).join("")}`;
 }
 
-/** What the inactivation protocol's h–V plot shows, under it. */
-export function inactNote(ph: number): string {
-  return `Dots: peak INa at the test step, over the largest. Line: ${hInfLabel(ph)} at the prepulse. They match when h settles during the prepulse; make τh slower and they part.`;
+/** What the inactivation protocol's h–V plot shows, under it: sodium, potassium, or both, as drawn. */
+export function inactNote(ph: number, na: boolean, k: boolean): string {
+  const out: string[] = [];
+  if (na) out.push(`Dots: peak INa at the test step, over the largest. Line: ${hInfLabel(ph)} at the prepulse. They match when h settles during the prepulse; make τh slower and they part.`);
+  if (k) out.push("IK at the end of the test step, over the largest, barely moves: this potassium channel has no inactivation gate.");
+  return out.join(" ");
 }

@@ -383,6 +383,19 @@ are unchanged to the bit (checked against the previous `clampFamily`).
 One change to the step family's g–V: peak gNa is now read in the step
 alone. It was the largest over the whole sweep, so a step below the holding
 potential showed the hold's gNa as its peak.
+
+Owner review on the dev site: "K is selected but not shown on inact plot".
+h–V drew sodium alone, whatever the toggles said. Now Na and K follow their
+toggles there too, and K is gK at the end of the test step over the
+largest: within 0.01 of 1 at every prepulse (tested, with several edits),
+because IK = ḡK nᵖ (V − EK) has no inactivation gate. The note says so
+when K is drawn.
+
+Asked at the same time: the recovery time between sweeps. There is none to
+set: every sweep, in both protocols, starts from the steady state at the
+holding potential, as if the cell rested indefinitely between sweeps.
+Recovery from inactivation (two pulses, a varying interval between them)
+is a protocol of its own, not built.
 ## 2026-11-07: a dev site, for review before a release
 
 Students in Les Satin's ephys class are using the live site; the owner: "we

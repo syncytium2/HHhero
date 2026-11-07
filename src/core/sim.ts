@@ -171,6 +171,16 @@ export function clampFamily(md: Model, c: ClampProtocol): ClampSweep[] {
  * driving force is the same in every sweep, so this is also peak INa over the
  * largest peak INa.
  */
+/**
+ * Potassium on the same protocol: each sweep's gK at the end of the test step
+ * over the family's largest (0 when none has any). Also IK over the largest IK.
+ */
+export function kAtEnd(fam: ClampSweep[]): number[] {
+  const end = fam.map((s) => s.gK[s.gK.length - 1]);
+  const top = Math.max(0, ...end);
+  return end.map((x) => (top > 0 ? x / top : 0));
+}
+
 export function availability(fam: ClampSweep[]): number[] {
   const top = Math.max(0, ...fam.map((s) => s.gNaPeak));
   return fam.map((s) => (top > 0 ? s.gNaPeak / top : 0));

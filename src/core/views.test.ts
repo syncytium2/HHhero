@@ -8,7 +8,7 @@ import { buildGate, GATE_IDS, NO_EDIT, phiAt, rate, STOCK_RATES, stockGate, type
 import { hhH, hhM, hhN, hhPhi } from "./reference.ts";
 import { hInfLabel, inactNote, noteFor } from "./notes.ts";
 import { buildModel, stockParams, type Params } from "./model.ts";
-import { availability, clampFamily, DEFAULT_INACT, type ClampProtocol } from "./sim.ts";
+import { availability, clampFamily, DEFAULT_INACT, kAtEnd, type ClampProtocol } from "./sim.ts";
 
 const REF = { m: hhM, h: hhH, n: hhN };
 const VS: number[] = [];
@@ -165,7 +165,17 @@ describe("the inactivation note is true: the dots are h∞ when h settles in the
     expect(hInfLabel(1)).toBe("h∞");
     expect(hInfLabel(2)).toBe("h∞²");
     expect(hInfLabel(0)).toBe("h∞⁰");
-    expect(inactNote(1)).toContain("Line: h∞ at the prepulse");
-    expect(inactNote(3)).toContain("Line: h∞³ at the prepulse");
+    expect(inactNote(1, true, false)).toContain("Line: h∞ at the prepulse");
+    expect(inactNote(3, true, false)).toContain("Line: h∞³ at the prepulse");
+    expect(inactNote(1, false, true)).not.toContain("INa");
+    expect(inactNote(1, true, true)).toContain("potassium");
+  });
+
+  it("potassium barely moves: end-of-test IK within 0.01 of the largest at every prepulse, and the model has no K inactivation gate", () => {
+    for (const p of [S, { ...S, celsius: 20 }, { ...S, gK: 10 }, { ...S, pn: 3 }])
+      for (const c of [DEFAULT_INACT, fine]) for (const x of kAtEnd(clampFamily(buildModel(p), c))) expect(x).toBeGreaterThan(0.99);
+    // IK = ḡK nᵖ (V − EK): no gate but n, so nothing a prepulse sets can outlast the test step except n itself
+    const md = buildModel(S);
+    expect(md.openK(0.5)).toBe(Math.pow(0.5, S.pn));
   });
 });

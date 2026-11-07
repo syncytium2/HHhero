@@ -19,7 +19,7 @@ import {
 } from "./core/rates.ts";
 import { buildModel, stockParams, type Model, type Params } from "./core/model.ts";
 import {
-  availability, clampFamily, clampLength, clampSegments, DEFAULT_CLAMP, DEFAULT_INACT, DEFAULT_STIM, evenLadder, lastStepAt, fires, freeRun, niceStep, pulseThreshold, settle, testPotentials, thresholdLadder,
+  availability, clampFamily, kAtEnd, clampLength, clampSegments, DEFAULT_CLAMP, DEFAULT_INACT, DEFAULT_STIM, evenLadder, lastStepAt, fires, freeRun, niceStep, pulseThreshold, settle, testPotentials, thresholdLadder,
   type ClampProtocol, type ClampSweep, type Stimulus,
 } from "./core/sim.ts";
 import { hInfLabel, inactNote, noteFor, type View } from "./core/notes.ts";
@@ -467,6 +467,7 @@ function Main({ onRetro }: { onRetro: () => void }) {
     if (iv && inact) {
       // inactivation: each prepulse's peak at the test step, over the largest, on the h∞ the model has
       const vs = upTo(fam.map((s) => s.v));
+      const naOn = clampCur.includes("iNa"), kOn = clampCur.includes("iK");
       const lo = clamp.from - 5, hi = clamp.to + 5;
       const grid = Array.from({ length: 121 }, (_, i) => lo + ((hi - lo) * i) / 120);
       const hLine = (m: Model) => {
@@ -481,11 +482,13 @@ function Main({ onRetro }: { onRetro: () => void }) {
           x={[lo, hi]}
           y={[-0.04, 1.08]}
           xLabel="prepulse potential (mV)"
-          yLabel={`peak INa ÷ largest · line ${hInfLabel(p.ph)}`}
+          yLabel={`${[naOn && "peak INa", kOn && "end IK"].filter(Boolean).join(", ")} ÷ largest${naOn ? ` · line ${hInfLabel(p.ph)}` : ""}`}
           series={[
-            { x: vs, y: upTo(availability(famStock)), color: C.stock, width: 3 },
-            { x: grid, y: hLine(md), color: C.h, width: 1.4, dash: "5 4", label: hInfLabel(p.ph) },
-            { x: vs, y: upTo(availability(fam)), color: C.na, label: "INa peak", dots: true },
+            ...(naOn ? [{ x: vs, y: upTo(availability(famStock)), color: C.stock, width: 3 }] : []),
+            ...(kOn ? [{ x: vs, y: upTo(kAtEnd(famStock)), color: C.stock, width: 3, dash: "5 4" }] : []),
+            ...(naOn ? [{ x: grid, y: hLine(md), color: C.h, width: 1.4, dash: "5 4", label: hInfLabel(p.ph) }] : []),
+            ...(kOn ? [{ x: vs, y: upTo(kAtEnd(fam)), color: C.k, dash: "5 4", label: "IK end", dots: true }] : []),
+            ...(naOn ? [{ x: vs, y: upTo(availability(fam)), color: C.na, label: "INa peak", dots: true }] : []),
           ]}
         />
       );
@@ -883,7 +886,7 @@ function Main({ onRetro }: { onRetro: () => void }) {
                       <button className={clampG ? "on" : ""} aria-pressed={clampG} aria-label="conductance" onClick={() => setClampG(!clampG)}
                         {...tour("g", "Conductance instead of current: what the channels do, without the driving force.")}>g</button>
                       <button className={`iv-btn${iv ? " on" : ""}`} aria-pressed={iv} onClick={() => setIv(!iv)}
-                        {...tour(inact ? "h–V" : "I–V", inact ? "Peak sodium at the test step against the prepulse, over h∞: the inactivation curve." : "Peak sodium and late potassium against the step voltage.")}>{inact ? "h–V" : clampG ? "g–V" : "I–V"}</button>
+                        {...tour(inact ? "h–V" : "I–V", inact ? "Peak sodium at the test step against the prepulse, over h∞: the inactivation curve. Potassium, if on, stays flat." : "Peak sodium and late potassium against the step voltage.")}>{inact ? "h–V" : clampG ? "g–V" : "I–V"}</button>
                     </>
                   )
                 : (["i", "g", "gates"] as const).map((k) => (
@@ -909,7 +912,7 @@ function Main({ onRetro }: { onRetro: () => void }) {
               {reading ? <b className="reading">{reading}</b> : (
                 <>
                   {!stepping && (tab === "clamp" ? "Ideal clamp, no electrode: what no rig records." : "The membrane alone, no electrode.")}
-                  {tab === "clamp" && iv && inact && ` ${inactNote(p.ph)}`}
+                  {tab === "clamp" && iv && inact && ` ${inactNote(p.ph, clampCur.includes("iNa"), clampCur.includes("iK"))}`}
                   {!stepping && (tab === "spike" || !iv) && !zoomOn && (mouse ? " Drag across the traces or scroll to zoom time; double-click to reset." : " Pinch to zoom time, drag to pan, double-tap to reset.")}
                   {stepping && mouse && !zoomOn && "The arrow keys, or a presentation clicker, step too."}
                 </>

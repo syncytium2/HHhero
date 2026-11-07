@@ -318,6 +318,13 @@ const hv = await phone.evaluate(() => {
 });
 if (!(hv.plotBottom <= hv.h && hv.sliderTop < hv.h - 44)) problems.push(`phone: the h–V plot and a slider are not on screen together ${JSON.stringify(hv)}`);
 await noSideways(phone, "phone inactivation");
+// potassium on h–V: drawn when K is on, flat, with its own sentence in the note
+await phone.getByRole("button", { name: "potassium" }).tap();
+await phone.waitForTimeout(150);
+await phone.screenshot({ path: `${out}/phone-inact-hv-k.png` });
+if (!(await phone.locator('svg[aria-label="steady-state inactivation"] text', { hasText: "IK end" }).count())) problems.push("phone: K is on but h–V does not draw potassium");
+if (!(await phone.getByText(/no inactivation gate/).count())) problems.push("phone: h–V with K has no potassium note");
+await phone.getByRole("button", { name: "potassium" }).tap();
 await phone.getByRole("button", { name: "h–V" }).tap();
 await phone.getByRole("radio", { name: "Steps" }).tap();
 await phone.waitForTimeout(80);
