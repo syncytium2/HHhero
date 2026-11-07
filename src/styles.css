@@ -115,6 +115,8 @@ a { color: inherit; }
 .about-card h3 { font-size: 15px; margin: 12px 0 6px; }
 .archived { margin: 0; padding: 8px 12px; background: var(--note); font-size: 13.5px; }
 .archived a { font-weight: 600; }
+/* the dev site's banner: one line, so a phone keeps the plots and controls where they are */
+.dev-site { padding: 3px 12px; font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .about-card h2 { font-size: 17px; margin: 0 0 8px; }
 .about-card p { margin: 0 0 10px; font-size: 14.5px; }
 .about-card .byline { font-size: 13px; color: var(--muted); margin-top: -4px; }
@@ -125,6 +127,9 @@ a { color: inherit; }
 /* Wide screens (the lecture bonus): plots on the left, controls in a column on the right. */
 .app.wide { display: grid; grid-template-columns: minmax(0, 1fr) 400px; grid-template-rows: auto minmax(0, 1fr); }
 .app.wide .top { grid-column: 1 / -1; }
+/* a banner (an earlier version, or the dev site) is a row of its own, the width of the page */
+.app.wide:has(> .archived) { grid-template-rows: auto auto minmax(0, 1fr); }
+.app.wide > .archived { grid-column: 1 / -1; }
 .app.wide .plots { padding: 10px; overflow-y: auto; }
 .app.wide .controls { margin-top: 0; border-top: 0; border-left: 1px solid var(--line); }
 .app.wide .card-head { font-size: 14px; }

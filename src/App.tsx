@@ -763,8 +763,8 @@ function Main({ onRetro }: { onRetro: () => void }) {
       </header>
 
       {DEV_SITE && (
-        <p className="archived">
-          Dev preview of {DEV_SITE}, for review: not the live site. <a href="https://hhhero.tonydefazio.com/">Go to HHhero</a>
+        <p className="archived dev-site" title="A preview for review, not the site students use">
+          Dev preview: {DEV_SITE}. <a href="https://hhhero.tonydefazio.com/">Live site</a>
         </p>
       )}
       {ARCHIVED && (

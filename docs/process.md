@@ -362,6 +362,11 @@ robots.txt Disallow), so a student's search cannot land on it. Anyone with
 the link can open it; Cloudflare Access could put a login in front, set up
 in the dashboard if wanted.
 
+The banner is one line, so on a phone the plots and controls stay where
+they are. On a wide screen a banner used to land in the page grid's body
+row and push the content out of place; the earlier-version banner on /v/
+had the same fault. A banner now gets a row of its own.
+
 Considered and set aside: Cloudflare's preview URLs on the live worker
 (`preview_urls` is on). They avoid going live too, but every upload gets a
 new address, awkward to bookmark or send to a reviewer.
