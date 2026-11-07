@@ -17,22 +17,41 @@ import { powi, restingV, type Model } from "./model.ts";
 // ---------------------------------------------------------------- voltage clamp
 
 export interface ClampProtocol {
+  /**
+   * "steps": hold, then a family of test steps (activation).
+   * "inact": hold, then a family of conditioning prepulses, then one fixed
+   * test step; the peak INa at the test step against the prepulse is the
+   * steady-state inactivation (h∞) curve, as Hodgkin & Huxley 1952c measured it.
+   */
+  kind: "steps" | "inact";
   /** holding potential, mV */
   hold: number;
-  /** first and last test potential, and the spacing, mV */
+  /** the family: first and last potential, and the spacing, mV (the steps, or the prepulses) */
   from: number;
   to: number;
   by: number;
-  /** time at hold before the step, and the step's length, ms */
+  /** time at hold before the family's step, ms */
   pre: number;
+  /** "inact" only: the prepulse's length, ms, and the test potential, mV */
+  cond: number;
+  test: number;
+  /** the last step's length (the step, or the test step), ms */
   dur: number;
   /** sample interval, ms */
   dtOut: number;
 }
 
-export const DEFAULT_CLAMP: ClampProtocol = { hold: -65, from: -55, to: 45, by: 10, pre: 1, dur: 10, dtOut: 0.02 };
+export const DEFAULT_CLAMP: ClampProtocol = { kind: "steps", hold: -65, from: -55, to: 45, by: 10, pre: 1, cond: 0, test: 0, dur: 10, dtOut: 0.02 };
+
+/**
+ * The prepulses run long enough for h to settle (50 ms is more than five of
+ * its slowest τ at 6.3 °C), and the test step goes to 0 mV, where h∞ is near
+ * zero, so the test step's peak INa is set by h at the end of the prepulse.
+ */
+export const DEFAULT_INACT: ClampProtocol = { kind: "inact", hold: -65, from: -125, to: -25, by: 10, pre: 1, cond: 50, test: 0, dur: 10, dtOut: 0.02 };
 
 export interface ClampSweep {
+  /** the family's potential: the step, or the prepulse */
   v: number;
   t: Float64Array;
   /** µA/cm², outward positive */
@@ -44,8 +63,9 @@ export interface ClampSweep {
   m: Float64Array;
   h: Float64Array;
   n: Float64Array;
-  /** the largest-magnitude INa during the step (its sign kept), and IK at the end of the step */
+  /** during the last step (the step, or the test step): the largest-magnitude INa (its sign kept) and the largest gNa; IK at its end */
   iNaPeak: number;
+  gNaPeak: number;
   iKEnd: number;
 }
 
@@ -55,39 +75,105 @@ export function testPotentials(c: ClampProtocol): number[] {
   return out;
 }
 
+/** When the last step (the step, or the test step) begins, ms. */
+export function lastStepAt(c: ClampProtocol): number {
+  return c.kind === "inact" ? c.pre + c.cond : c.pre;
+}
+
+/** The sweep's length, ms. */
+export function clampLength(c: ClampProtocol): number {
+  return lastStepAt(c) + c.dur;
+}
+
+/** The command voltage as segments: each from its start time, ms, at a voltage, mV. */
+export function clampSegments(c: ClampProtocol, v: number): { t0: number; v: number }[] {
+  return c.kind === "inact"
+    ? [{ t0: 0, v: c.hold }, { t0: c.pre, v }, { t0: c.pre + c.cond, v: c.test }]
+    : [{ t0: 0, v: c.hold }, { t0: c.pre, v }];
+}
+
+/** Past this long into a prepulse, the inactivation protocol samples every COARSE_MS: m has long settled, and h and n are slow. */
+export const FINE_MS = 5, COARSE_MS = 0.5;
+
+/**
+ * The sample times, ms. The step family: every dtOut. The inactivation
+ * protocol: every dtOut, except a prepulse past its first FINE_MS, which is
+ * sampled about every COARSE_MS (ending exactly at the test step), so a long
+ * prepulse stays a few thousand points.
+ */
+export function clampTimes(c: ClampProtocol): Float64Array {
+  if (c.kind !== "inact") return Float64Array.from({ length: Math.round(clampLength(c) / c.dtOut) + 1 }, (_, i) => i * c.dtOut);
+  const t: number[] = [];
+  const fine = (t0: number, ms: number) => { const k = Math.round(ms / c.dtOut); for (let i = 1; i <= k; i++) t.push(t0 + i * c.dtOut); };
+  t.push(0);
+  fine(0, c.pre);
+  const f = Math.min(FINE_MS, c.cond);
+  fine(c.pre, f);
+  const rest = c.cond - f, nc = Math.ceil(rest / COARSE_MS - 1e-9);
+  for (let i = 1; i <= nc; i++) t.push(i === nc ? c.pre + c.cond : c.pre + f + (i * rest) / nc);
+  fine(c.pre + c.cond, c.dur);
+  return Float64Array.from(t);
+}
+
 export function clampFamily(md: Model, c: ClampProtocol): ClampSweep[] {
   const { p, g } = md;
-  const n = Math.round((c.pre + c.dur) / c.dtOut) + 1;
-  const x0 = { m: g.m.inf(c.hold), h: g.h.inf(c.hold), n: g.n.inf(c.hold) };
+  const times = clampTimes(c);
+  const n = times.length;
+  const tLast = lastStepAt(c);
   return testPotentials(c).map((v) => {
-    const inf = { m: g.m.inf(v), h: g.h.inf(v), n: g.n.inf(v) };
-    const tau = { m: g.m.tau(v), h: g.h.tau(v), n: g.n.tau(v) };
     const sw: ClampSweep = {
       v,
       t: new Float64Array(n), iNa: new Float64Array(n), iK: new Float64Array(n),
       gNa: new Float64Array(n), gK: new Float64Array(n),
       m: new Float64Array(n), h: new Float64Array(n), n: new Float64Array(n),
-      iNaPeak: 0, iKEnd: 0,
+      iNaPeak: 0, gNaPeak: 0, iKEnd: 0,
     };
+    // each segment relaxes every gate exactly from where the one before left it; the first starts at rest at hold
+    const seg = clampSegments(c, v).map((s) => ({
+      ...s,
+      inf: { m: g.m.inf(s.v), h: g.h.inf(s.v), n: g.n.inf(s.v) },
+      tau: { m: g.m.tau(s.v), h: g.h.tau(s.v), n: g.n.tau(s.v) },
+      x0: { m: 0, h: 0, n: 0 },
+    }));
+    seg[0].x0 = { ...seg[0].inf };
+    for (let j = 1; j < seg.length; j++) {
+      const a = seg[j - 1], dt = seg[j].t0 - a.t0;
+      const at = (id: "m" | "h" | "n") => a.inf[id] + (a.x0[id] - a.inf[id]) * Math.exp(-dt / a.tau[id]);
+      seg[j].x0 = { m: at("m"), h: at("h"), n: at("n") };
+    }
+    let j = 0;
     for (let i = 0; i < n; i++) {
-      const t = i * c.dtOut;
-      const on = t > c.pre;
-      const ts = t - c.pre;
-      const vm = on ? v : c.hold;
-      const m = on ? inf.m + (x0.m - inf.m) * Math.exp(-ts / tau.m) : x0.m;
-      const h = on ? inf.h + (x0.h - inf.h) * Math.exp(-ts / tau.h) : x0.h;
-      const nn = on ? inf.n + (x0.n - inf.n) * Math.exp(-ts / tau.n) : x0.n;
+      const t = times[i];
+      // a sample exactly at a step's time still belongs to the segment before it
+      while (j + 1 < seg.length && t > seg[j + 1].t0) j++;
+      const s = seg[j], ts = t - s.t0;
+      const relax = (id: "m" | "h" | "n") => (j === 0 ? s.x0[id] : s.inf[id] + (s.x0[id] - s.inf[id]) * Math.exp(-ts / s.tau[id]));
+      const m = relax("m"), h = relax("h"), nn = relax("n");
       const gna = p.gNa * md.openNa(m, h);
       const gk = p.gK * md.openK(nn);
       sw.t[i] = t; sw.m[i] = m; sw.h[i] = h; sw.n[i] = nn;
       sw.gNa[i] = gna; sw.gK[i] = gk;
-      sw.iNa[i] = gna * (vm - p.eNa);
-      sw.iK[i] = gk * (vm - p.eK);
-      if (on && Math.abs(sw.iNa[i]) > Math.abs(sw.iNaPeak)) sw.iNaPeak = sw.iNa[i];
+      sw.iNa[i] = gna * (s.v - p.eNa);
+      sw.iK[i] = gk * (s.v - p.eK);
+      if (t > tLast) {
+        if (Math.abs(sw.iNa[i]) > Math.abs(sw.iNaPeak)) sw.iNaPeak = sw.iNa[i];
+        if (gna > sw.gNaPeak) sw.gNaPeak = gna;
+      }
     }
     sw.iKEnd = sw.iK[n - 1];
     return sw;
   });
+}
+
+/**
+ * Inactivation: each sweep's peak gNa at the test step divided by the
+ * family's largest (0 when no sweep has any). At a fixed test potential the
+ * driving force is the same in every sweep, so this is also peak INa over the
+ * largest peak INa.
+ */
+export function availability(fam: ClampSweep[]): number[] {
+  const top = Math.max(0, ...fam.map((s) => s.gNaPeak));
+  return fam.map((s) => (top > 0 ? s.gNaPeak / top : 0));
 }
 
 // ---------------------------------------------------------------- current clamp

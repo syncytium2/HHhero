@@ -19,10 +19,10 @@ import {
 } from "./core/rates.ts";
 import { buildModel, stockParams, type Model, type Params } from "./core/model.ts";
 import {
-  clampFamily, DEFAULT_CLAMP, DEFAULT_STIM, evenLadder, fires, freeRun, niceStep, pulseThreshold, settle, testPotentials, thresholdLadder,
+  availability, clampFamily, clampLength, clampSegments, DEFAULT_CLAMP, DEFAULT_INACT, DEFAULT_STIM, evenLadder, lastStepAt, fires, freeRun, niceStep, pulseThreshold, settle, testPotentials, thresholdLadder,
   type ClampProtocol, type ClampSweep, type Stimulus,
 } from "./core/sim.ts";
-import { noteFor, type View } from "./core/notes.ts";
+import { hInfLabel, inactNote, noteFor, type View } from "./core/notes.ts";
 import { ARCHIVED, BORN, EARLIER, VERSION } from "./version.ts";
 
 type Sel = GateId | "na" | "k" | "mem" | "proto";
@@ -147,7 +147,16 @@ function Main({ onRetro }: { onRetro: () => void }) {
   const [spikeT, setSpikeT] = useState<number | null>(null);
   const [clampPick, setClampPick] = useState<number | null>(null);
   const [spikeTrace, setSpikeTrace] = useState<"i" | "g" | "gates">("i");
-  const [clamp, setClamp] = useState<ClampProtocol>(DEFAULT_CLAMP);
+  // two clamp protocols, each keeping its own settings: the step family, and inactivation (prepulses, then one test step)
+  const [clampSteps, setClampSteps] = useState<ClampProtocol>(DEFAULT_CLAMP);
+  const [clampInact, setClampInact] = useState<ClampProtocol>(DEFAULT_INACT);
+  const [inact, setInact] = useState(false);
+  const clamp = inact ? clampInact : clampSteps;
+  const setClamp = inact ? setClampInact : setClampSteps;
+  const clampStock = inact ? DEFAULT_INACT : DEFAULT_CLAMP;
+  // the sweep's length changes with the protocol: start it unzoomed, with no cursor
+  const pickProtocol = (on: boolean) => { setInact(on); setClampX(null); setClampT(null); setClampPick(null); };
+  const resetClamps = () => { setClampSteps(DEFAULT_CLAMP); setClampInact(DEFAULT_INACT); };
   const [stim, setStim] = useState<Stimulus>(DEFAULT_STIM);
   const [cursor, setCursor] = useState(-40);
   const [about, setAbout] = useState(false);
@@ -266,7 +275,7 @@ function Main({ onRetro }: { onRetro: () => void }) {
     if (s === "na") return p.gNa !== STOCK.gNa || p.eNa !== STOCK.eNa || p.pm !== STOCK.pm || p.ph !== STOCK.ph;
     if (s === "k") return p.gK !== STOCK.gK || p.eK !== STOCK.eK || p.pn !== STOCK.pn;
     if (s === "mem") return p.celsius !== STOCK.celsius || p.gL !== STOCK.gL || p.eL !== STOCK.eL || p.cm !== STOCK.cm;
-    return JSON.stringify(clamp) !== JSON.stringify(DEFAULT_CLAMP) || JSON.stringify(stim) !== JSON.stringify(DEFAULT_STIM) || ladderSpec !== null;
+    return JSON.stringify(clampSteps) !== JSON.stringify(DEFAULT_CLAMP) || JSON.stringify(clampInact) !== JSON.stringify(DEFAULT_INACT) || JSON.stringify(stim) !== JSON.stringify(DEFAULT_STIM) || ladderSpec !== null;
   };
   const anyEdited = (["m", "h", "n", "na", "k", "mem", "proto"] as Sel[]).some(edited);
 
@@ -365,7 +374,7 @@ function Main({ onRetro }: { onRetro: () => void }) {
     return [lo, hi];
   };
   // one horizontal zoom per experiment, shared by every plot on its time axis
-  const clampFull: Range = [0, clamp.pre + clamp.dur];
+  const clampFull: Range = [0, clampLength(clamp)];
   const spikeFull: Range = [0, sweepMs];
   // the reset lives in the caption, not over a plot
   const clampZoom = { view: clampView(clampX ?? clampFull, clampFull, 0.5), onView: setClampX, minSpan: 0.5, button: false };
@@ -397,7 +406,9 @@ function Main({ onRetro }: { onRetro: () => void }) {
     if (best >= 0 && !stepping) setClampPick(best);
     setClampT(t);
   };
-  const onClampStrip = (t: number, y?: number) => (y === undefined || t <= clamp.pre ? setClampT(t) : nearestSweep(t, y, (j) => fam[j].v));
+  // before the family's step, and in the test step, every sweep has the same command: no sweep to pick
+  const onClampStrip = (t: number, y?: number) =>
+    y === undefined || t <= clamp.pre || (inact && t > lastStepAt(clamp)) ? setClampT(t) : nearestSweep(t, y, (j) => fam[j].v);
   const clampCursor = measure ? { cursor: clampT ?? undefined } : {};
   const spikeCursor = measure ? { cursor: spikeT ?? undefined, onCursor: (t: number) => setSpikeT(t) } : {};
   const toggleMeasure = () => { setMeasure(!measure); setClampT(null); setSpikeT(null); setClampPick(null); };
@@ -414,15 +425,20 @@ function Main({ onRetro }: { onRetro: () => void }) {
         {...clampCursor}
         onCursor={measure ? onClampStrip : undefined}
         noXTicks
-        yInclude={[clamp.hold, clamp.from, clamp.to]}
-        yLabel={`command V (mV): hold ${fmt(clamp.hold)}, steps ${fmt(clamp.from)} to ${fmt(clamp.to)} by ${fmt(clamp.by)}`}
-        series={upTo(steps).map((v, j) => ({
-          x: [0, clamp.pre, clamp.pre, clamp.pre + clamp.dur],
-          y: [clamp.hold, clamp.hold, v, v],
+        yInclude={[clamp.hold, clamp.from, clamp.to, ...(inact ? [clamp.test] : [])]}
+        yLabel={inact
+          ? `command V (mV): prepulses ${fmt(clamp.from)} to ${fmt(clamp.to)} by ${fmt(clamp.by)}, then test ${fmt(clamp.test)}`
+          : `command V (mV): hold ${fmt(clamp.hold)}, steps ${fmt(clamp.from)} to ${fmt(clamp.to)} by ${fmt(clamp.by)}`}
+        series={upTo(steps).map((v, j) => {
+          const seg = clampSegments(clamp, v), end = clampLength(clamp);
+          return {
+          x: seg.flatMap((g, i) => [g.t0, seg[i + 1]?.t0 ?? end]),
+          y: seg.flatMap((g) => [g.v, g.v]),
           color: C.ink,
           width: bold(j) ?? (measure && clampT !== null && j === mi ? 2.2 : 1.2),
           opacity: measure && clampT !== null && j === mi ? 1 : fade(j),
-        }))}
+          };
+        })}
       />
     ) : (
       <Plot
@@ -446,12 +462,37 @@ function Main({ onRetro }: { onRetro: () => void }) {
 
   let simPlot;
   if (tab === "clamp") {
-    if (iv) {
+    if (iv && inact) {
+      // inactivation: each prepulse's peak at the test step, over the largest, on the h∞ the model has
+      const vs = upTo(fam.map((s) => s.v));
+      const lo = clamp.from - 5, hi = clamp.to + 5;
+      const grid = Array.from({ length: 121 }, (_, i) => lo + ((hi - lo) * i) / 120);
+      const hLine = (m: Model) => {
+        const y = grid.map((v) => Math.pow(m.g.h.inf(v), m.p.ph));
+        const top = Math.max(...fam.map((s) => Math.pow(m.g.h.inf(s.v), m.p.ph)));
+        return y.map((x) => (top > 0 ? x / top : 0));
+      };
+      simPlot = (
+        <Plot
+          height={H.sim}
+          ariaLabel="steady-state inactivation"
+          x={[lo, hi]}
+          y={[-0.04, 1.08]}
+          xLabel="prepulse potential (mV)"
+          yLabel={`peak INa ÷ largest · line ${hInfLabel(p.ph)}`}
+          series={[
+            { x: vs, y: upTo(availability(famStock)), color: C.stock, width: 3 },
+            { x: grid, y: hLine(md), color: C.h, width: 1.4, dash: "5 4", label: hInfLabel(p.ph) },
+            { x: vs, y: upTo(availability(fam)), color: C.na, label: "INa peak", dots: true },
+          ]}
+        />
+      );
+    } else if (iv) {
       // stepping builds the curve a point at a time, on the axes the whole family needs
       const vs = upTo(fam.map((s) => s.v));
       // peak INa and IK at the end of the step; or peak gNa and gK at the end
       const ivOf = (s: ClampSweep, which: "iNaPeak" | "iKEnd") =>
-        !clampG ? s[which] / 1000 : which === "iNaPeak" ? Math.max(...s.gNa) : s.gK[s.gK.length - 1];
+        !clampG ? s[which] / 1000 : which === "iNaPeak" ? s.gNaPeak : s.gK[s.gK.length - 1];
       const pk = (f: typeof fam, which: "iNaPeak" | "iKEnd") => upTo(f.map((s) => ivOf(s, which)));
       simPlot = (
         <Plot
@@ -560,7 +601,8 @@ function Main({ onRetro }: { onRetro: () => void }) {
     else {
       const sw = fam[mi], t = clampT;
       const cur = (["iNa", "iK"] as Cur[]).map((c) => `${cqLabel(c)} ${fmt(valAt(sw.t, cq(sw, c), t))}`).join(", ");
-      reading = `t ${fmt(t)} ms · ${t > clamp.pre ? `step to ${fmt(sw.v)}` : `hold ${fmt(clamp.hold)}`} mV · ${cur} ${cqUnit}`;
+      const where = t <= clamp.pre ? `hold ${fmt(clamp.hold)}` : inact && t > lastStepAt(clamp) ? `test ${fmt(clamp.test)}` : `${inact ? "prepulse" : "step"} to ${fmt(sw.v)}`;
+      reading = `t ${fmt(t)} ms · ${where} mV · ${cur} ${cqUnit}`;
     }
   } else if (measure && tab === "spike") {
     if (spikeT === null) reading = mouse ? "Click the traces to measure; drag the line to move." : "Tap the traces to measure; drag the line to move.";
@@ -578,7 +620,9 @@ function Main({ onRetro }: { onRetro: () => void }) {
   // what this step is, in words
   let stepText = "";
   if (stepping && tab === "clamp") {
-    stepText = `Step ${k + 1} of ${nSteps}: ${fmt(clamp.hold)} → ${fmt(fam[k].v)} mV`;
+    stepText = inact
+      ? `Prepulse ${k + 1} of ${nSteps}: ${fmt(fam[k].v)} mV for ${fmt(clamp.cond)} ms, then test ${fmt(clamp.test)} mV`
+      : `Step ${k + 1} of ${nSteps}: ${fmt(clamp.hold)} → ${fmt(fam[k].v)} mV`;
   } else if (stepping && ladder) {
     const r = ladder.rungs[k];
     const head = `Pulse ${k + 1} of ${nSteps}: ${fmt(r.amp)} µA/cm², ${r.fired ? "spike" : "no spike"}`;
@@ -690,12 +734,28 @@ function Main({ onRetro }: { onRetro: () => void }) {
     controls = (
       <>
         <fieldset className="group">
-          <legend className="formula">Voltage clamp: hold, then {testPotentials(clamp).length} steps from {fmt(clamp.from)} to {fmt(clamp.to)} mV by {fmt(clamp.by)}</legend>
-          <Slider label="holding potential" unit="mV" value={clamp.hold} min={-120} max={-30} step={1} stock={DEFAULT_CLAMP.hold} onChange={(v) => setClamp({ ...clamp, hold: v })} />
-          <Slider label="first step" unit="mV" value={clamp.from} min={-120} max={80} step={1} stock={DEFAULT_CLAMP.from} onChange={(v) => setClamp({ ...clamp, from: Math.min(v, clamp.to) })} />
-          <Slider label="last step" unit="mV" value={clamp.to} min={-120} max={80} step={1} stock={DEFAULT_CLAMP.to} onChange={(v) => setClamp({ ...clamp, to: Math.max(v, clamp.from) })} />
-          <Slider label="step spacing" unit="mV" value={clamp.by} min={1} max={50} step={1} stock={DEFAULT_CLAMP.by} onChange={(v) => setClamp({ ...clamp, by: Math.max(1, v) })} />
-          <Slider label="step length" unit="ms" value={clamp.dur} min={2} max={50} step={1} stock={DEFAULT_CLAMP.dur} onChange={(v) => setClamp({ ...clamp, dur: v })} />
+          <legend className="formula">
+            {inact
+              ? `Voltage clamp: ${testPotentials(clamp).length} prepulses from ${fmt(clamp.from)} to ${fmt(clamp.to)} mV by ${fmt(clamp.by)}, each ${fmt(clamp.cond)} ms, then a test step to ${fmt(clamp.test)}`
+              : `Voltage clamp: hold, then ${testPotentials(clamp).length} steps from ${fmt(clamp.from)} to ${fmt(clamp.to)} mV by ${fmt(clamp.by)}`}
+          </legend>
+          <Slider label="holding potential" unit="mV" value={clamp.hold} min={-120} max={-30} step={1} stock={clampStock.hold} onChange={(v) => setClamp({ ...clamp, hold: v })} />
+          <Slider label={inact ? "first prepulse" : "first step"} unit="mV" value={clamp.from} min={-150} max={80} step={1} stock={clampStock.from} onChange={(v) => setClamp({ ...clamp, from: Math.min(v, clamp.to) })} />
+          <Slider label={inact ? "last prepulse" : "last step"} unit="mV" value={clamp.to} min={-150} max={80} step={1} stock={clampStock.to} onChange={(v) => setClamp({ ...clamp, to: Math.max(v, clamp.from) })} />
+          <Slider label={inact ? "prepulse spacing" : "step spacing"} unit="mV" value={clamp.by} min={1} max={50} step={1} stock={clampStock.by} onChange={(v) => setClamp({ ...clamp, by: Math.max(1, v) })} />
+          {inact && (
+            <>
+              <Slider label="prepulse length" unit="ms" value={clamp.cond} min={1} max={500} log stock={clampStock.cond} onChange={(v) => setClamp({ ...clamp, cond: v })} />
+              <Slider label="test potential" unit="mV" value={clamp.test} min={-60} max={60} step={1} stock={clampStock.test} onChange={(v) => setClamp({ ...clamp, test: v })} />
+            </>
+          )}
+          <Slider label={inact ? "test length" : "step length"} unit="ms" value={clamp.dur} min={2} max={50} step={1} stock={clampStock.dur} onChange={(v) => setClamp({ ...clamp, dur: v })} />
+          <div className="ladder-pick" role="radiogroup" aria-label="voltage-clamp protocol">
+            <button role="radio" aria-checked={!inact} className={!inact ? "on" : ""} onClick={() => pickProtocol(false)}
+              {...tour("Steps", "A family of steps from one holding potential: sodium turns on, then off, and potassium turns on.", { kind: "pick" })}>Steps</button>
+            <button role="radio" aria-checked={inact} className={inact ? "on" : ""} onClick={() => pickProtocol(true)}
+              {...tour("Inactivation", "Hold each sweep at a different prepulse, then step all to one test potential. The sodium current left to flow shows how many channels the prepulse inactivated: the h–V button plots it.", { kind: "pick" })}>Inactivation</button>
+          </div>
         </fieldset>
         <fieldset className="group">
           <legend className="formula">Action potential: a current pulse at {fmt(stim.start)} ms</legend>
@@ -732,7 +792,7 @@ function Main({ onRetro }: { onRetro: () => void }) {
     else if (sel === "na") setP({ ...p, gNa: STOCK.gNa, eNa: STOCK.eNa, pm: STOCK.pm, ph: STOCK.ph });
     else if (sel === "k") setP({ ...p, gK: STOCK.gK, eK: STOCK.eK, pn: STOCK.pn });
     else if (sel === "mem") setP({ ...p, celsius: STOCK.celsius, gL: STOCK.gL, eL: STOCK.eL, cm: STOCK.cm });
-    else { setClamp(DEFAULT_CLAMP); setStim(DEFAULT_STIM); setLadderSpec(null); }
+    else { resetClamps(); setStim(DEFAULT_STIM); setLadderSpec(null); }
   };
 
   const chips: { id: Sel; label: string }[] = [
@@ -816,7 +876,7 @@ function Main({ onRetro }: { onRetro: () => void }) {
                       <button className={clampG ? "on" : ""} aria-pressed={clampG} aria-label="conductance" onClick={() => setClampG(!clampG)}
                         {...tour("g", "Conductance instead of current: what the channels do, without the driving force.")}>g</button>
                       <button className={`iv-btn${iv ? " on" : ""}`} aria-pressed={iv} onClick={() => setIv(!iv)}
-                        {...tour("I–V", "Peak sodium and late potassium against the step voltage.")}>{clampG ? "g–V" : "I–V"}</button>
+                        {...tour(inact ? "h–V" : "I–V", inact ? "Peak sodium at the test step against the prepulse, over h∞: the inactivation curve." : "Peak sodium and late potassium against the step voltage.")}>{inact ? "h–V" : clampG ? "g–V" : "I–V"}</button>
                     </>
                   )
                 : (["i", "g", "gates"] as const).map((k) => (
@@ -842,6 +902,7 @@ function Main({ onRetro }: { onRetro: () => void }) {
               {reading ? <b className="reading">{reading}</b> : (
                 <>
                   {!stepping && (tab === "clamp" ? "Ideal clamp, no electrode: what no rig records." : "The membrane alone, no electrode.")}
+                  {tab === "clamp" && iv && inact && ` ${inactNote(p.ph)}`}
                   {!stepping && (tab === "spike" || !iv) && !zoomOn && (mouse ? " Drag across the traces or scroll to zoom time; double-click to reset." : " Pinch to zoom time, drag to pan, double-tap to reset.")}
                   {stepping && mouse && !zoomOn && "The arrow keys, or a presentation clicker, step too."}
                 </>
@@ -872,7 +933,7 @@ function Main({ onRetro }: { onRetro: () => void }) {
           {controls}
           <div className="resets" {...tour("Reset", "Put one thing back, or everything.")}>
             <button onClick={resetSel} disabled={!edited(sel)}>Reset {chips.find((c) => c.id === sel)!.label}</button>
-            <button onClick={() => { setP(stockParams()); setClamp(DEFAULT_CLAMP); setStim(DEFAULT_STIM); setLadderSpec(null); }} disabled={!anyEdited}>Reset all</button>
+            <button onClick={() => { setP(stockParams()); resetClamps(); setStim(DEFAULT_STIM); setLadderSpec(null); }} disabled={!anyEdited}>Reset all</button>
           </div>
         </div>
       </aside>

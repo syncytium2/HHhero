@@ -287,6 +287,29 @@ await phone.getByRole("button", { name: "focus on the traces" }).tap();
 await phone.waitForTimeout(100);
 if (!(await phone.locator(".curves").count())) problems.push("phone: turning Focus off did not bring the curves back");
 
+// inactivation: prepulses then one test step; h–V plots the peak at the test step against the prepulse, over h∞
+await phone.getByRole("button", { name: "Voltage clamp" }).tap();
+await phone.locator(".chips").getByRole("tab", { name: "Protocol", exact: true }).tap();
+await phone.getByRole("radio", { name: "Inactivation" }).tap();
+await phone.waitForTimeout(150);
+await phone.screenshot({ path: `${out}/phone-inact.png` });
+if (!(await phone.getByText(/prepulses [-−]125 to [-−]25 by 10, then test 0/).count())) problems.push("phone: the inactivation protocol strip does not say its prepulses and test step");
+await phone.getByRole("button", { name: "h–V" }).tap();
+await phone.waitForTimeout(150);
+await phone.screenshot({ path: `${out}/phone-inact-hv.png` });
+if (!(await phone.locator('svg[aria-label="steady-state inactivation"]').count())) problems.push("phone: h–V did not draw the inactivation curve");
+if (!(await phone.getByText(/Line: h∞ at the prepulse/).count())) problems.push("phone: h–V has no note under it");
+const hv = await phone.evaluate(() => {
+  const s = document.querySelector('svg[aria-label="steady-state inactivation"]')?.getBoundingClientRect(), k = document.querySelector(".controls .slider")?.getBoundingClientRect();
+  return { plotBottom: s?.bottom, sliderTop: k?.top, h: innerHeight };
+});
+if (!(hv.plotBottom <= hv.h && hv.sliderTop < hv.h - 44)) problems.push(`phone: the h–V plot and a slider are not on screen together ${JSON.stringify(hv)}`);
+await noSideways(phone, "phone inactivation");
+await phone.getByRole("button", { name: "h–V" }).tap();
+await phone.getByRole("radio", { name: "Steps" }).tap();
+await phone.waitForTimeout(80);
+if (!(await phone.getByRole("button", { name: "I–V" }).count())) problems.push("phone: back on Steps, the I–V button did not come back");
+
 await phone.getByRole("button", { name: "Why" }).tap();
 await phone.waitForTimeout(100);
 await phone.screenshot({ path: `${out}/phone-about.png` });

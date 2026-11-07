@@ -34,7 +34,7 @@ export function modelAt(celsius: number): Model {
 /** a voltage-clamp step of `depol` mV from rest, `ms` long, starting at t = 0 */
 export function clampStep(md: Model, depol: number, ms: number): ClampSweep {
   const v = REST + depol;
-  return clampFamily(md, { hold: REST, from: v, to: v, by: 1, pre: 0, dur: ms, dtOut: 0.02 })[0];
+  return clampFamily(md, { kind: "steps", hold: REST, from: v, to: v, by: 1, pre: 0, cond: 0, test: 0, dur: ms, dtOut: 0.02 })[0];
 }
 
 /**

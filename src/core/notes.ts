@@ -31,3 +31,14 @@ export function noteFor(view: View, id: GateId, p: GateParams): string | null {
   if (tE && !iE) return `τ changed and ${id}∞ did not.`;
   return null;
 }
+
+/** The power of h as the h–V plot's line is labeled: h∞, or h∞² when INa is m³h². */
+export function hInfLabel(ph: number): string {
+  const sup = "⁰¹²³⁴⁵⁶⁷⁸⁹";
+  return ph === 1 ? "h∞" : `h∞${String(ph).split("").map((d) => sup[+d]).join("")}`;
+}
+
+/** What the inactivation protocol's h–V plot shows, under it. */
+export function inactNote(ph: number): string {
+  return `Dots: peak INa at the test step, over the largest. Line: ${hInfLabel(ph)} at the prepulse. They match when h settles during the prepulse; make τh slower and they part.`;
+}

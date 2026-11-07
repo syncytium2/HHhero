@@ -345,3 +345,41 @@ engines, so the owner chose to hide it: `SHOW_1952 = false` removes the
 header button and the Why page's sentence about it. `#1952` still opens the
 screen, unlinked, so the owner can review it on the live site. The
 screenshot check opens it by that address when there is no button.
+
+## 2026-11-07: the inactivation protocol
+
+The owner: "inactivation protocol missing or not plotted on IV page". It was
+missing: the clamp had one protocol, a step family from one holding
+potential. Advice given first: build the protocol once in `src/core/sim.ts`
+and use it in the main app now; the 1952 screen gets it later as a third
+drive on its rig, for Hodgkin & Huxley 1952c's figures, after the open
+review of Figs. 3, 12 and 19 and with the PDFs read for figure numbers. The
+owner: "Go".
+
+What was built. The clamp protocol has a kind: "steps", as before, or
+"inact": hold, a family of prepulses, then one fixed test step. Each kind
+keeps its own settings; Protocol picks between them (the pick sits under
+the clamp sliders, because above them it pushed the first slider off a
+phone screen in Focus). In inactivation the I–V button becomes h–V: each
+sweep's peak gNa at the test step over the family's largest (the same as
+peak INa over the largest, one driving force), as dots, over the model's
+h∞ (h∞ to h's power, if edited) as a line, with the stock cell in gray.
+
+Defaults: prepulses −125 to −25 mV by 10, each 50 ms, test to 0 mV for
+10 ms. 50 ms is more than five of h's slowest τ at 6.3 °C (8.6 ms), and h∞
+at 0 mV is 0.003, so the test step's peak is set by h at the end of the
+prepulse. Tested (`views.test.ts`): for the stock cell the dots are within
+0.02 of h∞ at every prepulse (0.013 at worst; at 20 °C, with h², m², and a
+quarter of ḡNa too); with τh ×10 the 50 ms prepulse leaves them more than
+0.1 apart, and a 500 ms prepulse brings them back. The note under the plot
+says exactly that much.
+
+Sampling. Plot draws every sample, so the inactivation sweep samples every
+0.02 ms near each command change and through the test step, and about every
+0.5 ms late in a prepulse (m has settled; h and n are slow): a 500 ms
+prepulse stays under 2500 points. The step family's sampling and values
+are unchanged to the bit (checked against the previous `clampFamily`).
+
+One change to the step family's g–V: peak gNa is now read in the step
+alone. It was the largest over the whole sweep, so a step below the holding
+potential showed the hold's gNa as its peak.

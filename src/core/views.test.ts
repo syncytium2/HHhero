@@ -6,7 +6,9 @@
 import { describe, expect, it } from "vitest";
 import { buildGate, GATE_IDS, NO_EDIT, phiAt, rate, STOCK_RATES, stockGate, type GateParams, type Rate } from "./rates.ts";
 import { hhH, hhM, hhN, hhPhi } from "./reference.ts";
-import { noteFor } from "./notes.ts";
+import { hInfLabel, inactNote, noteFor } from "./notes.ts";
+import { buildModel, stockParams, type Params } from "./model.ts";
+import { availability, clampFamily, DEFAULT_INACT, type ClampProtocol } from "./sim.ts";
 
 const REF = { m: hhM, h: hhH, n: hhN };
 const VS: number[] = [];
@@ -131,5 +133,39 @@ describe("what the notes claim", () => {
       expect(noteFor("ab", id, stockGate(id))).toBeNull();
       expect(noteFor("it", id, stockGate(id))).toBeNull();
     }
+  });
+});
+
+describe("the inactivation note is true: the dots are h∞ when h settles in the prepulse, and part when it does not", () => {
+  // the largest gap between the dots (peak INa over the largest) and the line (h∞ to h's power, over its largest)
+  const gap = (p: Params, c: ClampProtocol) => {
+    const md = buildModel(p);
+    const fam = clampFamily(md, c);
+    const a = availability(fam);
+    const line = fam.map((s) => Math.pow(md.g.h.inf(s.v), p.ph));
+    const top = Math.max(...line);
+    return Math.max(...fam.map((_, j) => Math.abs(a[j] - line[j] / top)));
+  };
+  const S = stockParams();
+  const fine = { ...DEFAULT_INACT, from: -130, to: -10, by: 1 };
+  const slowH = (scale: number): Params => ({ ...S, gates: { ...S.gates, h: { ...S.gates.h, it: { ...NO_EDIT, tauScale: scale } } } });
+
+  it("the stock cell: within 0.02 at every prepulse, at several temperatures and gate powers", () => {
+    expect(gap(S, DEFAULT_INACT)).toBeLessThan(0.02);
+    expect(gap(S, fine)).toBeLessThan(0.02);
+    for (const p of [{ ...S, celsius: 20 }, { ...S, ph: 2 }, { ...S, pm: 2 }, { ...S, gNa: 30 }]) expect(gap(p, fine)).toBeLessThan(0.02);
+  });
+
+  it("make τh slower and they part; a prepulse long enough for the slower h brings them back", () => {
+    expect(gap(slowH(10), DEFAULT_INACT)).toBeGreaterThan(0.1);
+    expect(gap(slowH(10), { ...DEFAULT_INACT, cond: 500 })).toBeLessThan(0.02);
+  });
+
+  it("the line is labeled with h's power", () => {
+    expect(hInfLabel(1)).toBe("h∞");
+    expect(hInfLabel(2)).toBe("h∞²");
+    expect(hInfLabel(0)).toBe("h∞⁰");
+    expect(inactNote(1)).toContain("Line: h∞ at the prepulse");
+    expect(inactNote(3)).toContain("Line: h∞³ at the prepulse");
   });
 });
