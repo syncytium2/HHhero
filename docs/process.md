@@ -345,3 +345,18 @@ engines, so the owner chose to hide it: `SHOW_1952 = false` removes the
 header button and the Why page's sentence about it. `#1952` still opens the
 screen, unlinked, so the owner can review it on the live site. The
 screenshot check opens it by that address when there is no button.
+
+## 2026-11-09: the inactivation paper
+
+The owner found the PDFs of Hodgkin & Huxley 1952a (116:449, currents
+carried by sodium and potassium) and 1952d (116:497, the dual effect:
+inactivation). Both are now in `lit/sources.json` (DOIs and PMIDs checked
+against PubMed) and in `lit/pdf/` on the Mac, uncommitted. 1952d does not
+change the model: the model paper's h was fitted to it, and its h∞ and τh
+still agree. Its first form of h is a steady-state curve with a time
+constant (eqn. 1, a Boltzmann with a 7 mV slope), which is the x∞, τ view
+this site is about. The Fig. 19 walk now ends on its two-pulse experiment:
+recovery from inactivation measured at τ ≈ 12 ms at 4.5 °C, against the
+model's 10.4 ms, with a test. Its other figures (conditioning then test,
+the steady-state curve, two pulses) need a clamp of more than one step;
+see the roadmap.
