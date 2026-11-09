@@ -19,10 +19,15 @@ both x∞ and τ. In the x∞, τ view you can move one and leave the other alon
 That difference is the lesson. Each view keeps its own edits; a gate edited
 in the other view says so, with a reset.
 
-For teaching from the front, the Step switch over the traces walks the
-voltage-clamp family one sweep at a time, or a ladder of current pulses up to
-and across threshold (your own ladder, if you set one in Protocol). The arrow
-keys and a presentation clicker step too. Focus, under the traces, hides the
+Protocol builds the experiment, in voltage clamp or current clamp: up to five
+epochs, each a level held for a time, either of which can change from sweep
+to sweep. Stock protocols start you off: a step family, inactivation,
+recovery from inactivation and tails in voltage clamp; a pulse, two pulses
+(the refractory period), anode break and a long step in current clamp.
+
+For teaching from the front, the Step switch over the traces walks the sweeps
+one at a time, or, for a single current pulse, a ladder of pulses up to and
+across threshold. The arrow keys and a presentation clicker step too. Focus, under the traces, hides the
 gate curves and gives the traces the screen; the device remembers it.
 
 New to it? Why, at the top, starts with what an action potential is and says

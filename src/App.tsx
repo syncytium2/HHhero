@@ -18,10 +18,12 @@ import {
   type GateId, type GateParams, type Rate,
 } from "./core/rates.ts";
 import { buildModel, stockParams, type Model, type Params } from "./core/model.ts";
+import { settle, spikeTimes, thresholdLadder, type ClampSweep } from "./core/sim.ts";
 import {
-  clampFamily, DEFAULT_CLAMP, DEFAULT_STIM, evenLadder, fires, freeRun, niceStep, pulseThreshold, settle, testPotentials, thresholdLadder,
-  type ClampProtocol, type ClampSweep, type Stimulus,
-} from "./core/sim.ts";
+  commandLine, DEFAULT_I, DEFAULT_V, epochAtTime, firesP, I_PRESETS, iclamp, iclampSweep, LETTERS, longestSweep, pulseAmp, swept,
+  sweepEpochs, thresholdP, V_PRESETS, vclamp, withPulse, type Protocol,
+} from "./core/protocol.ts";
+import { ProtocolEditor, protocolWords } from "./ui/ProtocolEditor.tsx";
 import { noteFor, type View } from "./core/notes.ts";
 import { ARCHIVED, BORN, EARLIER, VERSION } from "./version.ts";
 
@@ -45,7 +47,6 @@ function valAt(t: ArrayLike<number>, y: ArrayLike<number>, tq: number): number {
   const f = (tq - t[lo]) / (t[hi] - t[lo] || 1);
   return y[lo] + f * (y[hi] - y[lo]);
 }
-interface LadderSpec { first: number; by: number; count: number }
 
 const STOCK = stockParams();
 const STOCK_MODEL = buildModel(STOCK);
@@ -101,9 +102,13 @@ function curves(md: Model, id: GateId) {
 const STOCK_CURVES = { m: curves(STOCK_MODEL, "m"), h: curves(STOCK_MODEL, "h"), n: curves(STOCK_MODEL, "n") };
 
 const SETTLE_MS = 50, DT = 0.01;
-function spike(md: Model, stim: Stimulus) {
-  const st = settle(md, stim.hold, SETTLE_MS, DT);
-  return freeRun(md, stim, st, DT, 5);
+const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+/** what sweep k of a protocol is, in a few words: the swept epoch's value */
+function sweepWords(pr: Protocol, k: number): string {
+  const s = swept(pr);
+  if (!s) return "";
+  const e = sweepEpochs(pr, k)[s.epoch];
+  return s.what === "level" ? `${LETTERS[s.epoch]} at ${fmt(e.level)} ${pr.mode === "v" ? "mV" : "µA/cm²"}` : `${LETTERS[s.epoch]} ${fmt(e.dur)} ms`;
 }
 
 /**
@@ -147,8 +152,12 @@ function Main({ onRetro }: { onRetro: () => void }) {
   const [spikeT, setSpikeT] = useState<number | null>(null);
   const [clampPick, setClampPick] = useState<number | null>(null);
   const [spikeTrace, setSpikeTrace] = useState<"i" | "g" | "gates">("i");
-  const [clamp, setClamp] = useState<ClampProtocol>(DEFAULT_CLAMP);
-  const [stim, setStim] = useState<Stimulus>(DEFAULT_STIM);
+  // the protocols: one for each mode, each with the stock protocol it started from, and the epoch being edited
+  const [vp, setVp] = useState<Protocol>(DEFAULT_V);
+  const [ip, setIp] = useState<Protocol>(DEFAULT_I);
+  const [vBase, setVBase] = useState<Protocol>(DEFAULT_V);
+  const [iBase, setIBase] = useState<Protocol>(DEFAULT_I);
+  const [selEp, setSelEp] = useState(1);
   const [cursor, setCursor] = useState(-40);
   const [about, setAbout] = useState(false);
   const [touring, setTouring] = useState(false);
@@ -164,8 +173,6 @@ function Main({ onRetro }: { onRetro: () => void }) {
   const [stepping, setStepping] = useState(false);
   const [clampK, setClampK] = useState(0);
   const [spikeK, setSpikeK] = useState(0);
-  // the pulses to step through: null is the ladder built around this cell's threshold
-  const [ladderSpec, setLadderSpec] = useState<LadderSpec | null>(null);
   const [spikeX, setSpikeX] = useState<Range | null>(null);
   const wide = useWide();
   const winH = useWinH();
@@ -177,60 +184,51 @@ function Main({ onRetro }: { onRetro: () => void }) {
 
   const md = useMemo(() => buildModel(p), [p]);
   const cv = useMemo(() => ({ m: curves(md, "m"), h: curves(md, "h"), n: curves(md, "n") }), [md]);
-  const fam = useMemo(() => clampFamily(md, clamp), [md, clamp]);
-  const famStock = useMemo(() => clampFamily(STOCK_MODEL, clamp), [clamp]);
-  const sweepMs = Math.max(40, stim.start + stim.dur + 25);
-  const ap = useMemo(() => spike(md, { ...stim, sweep: sweepMs }), [md, stim, sweepMs]);
-  const apStock = useMemo(() => spike(STOCK_MODEL, { ...stim, sweep: sweepMs }), [stim, sweepMs]);
+  const fam = useMemo(() => vclamp(md, vp), [md, vp]);
+  const famStock = useMemo(() => vclamp(STOCK_MODEL, vp), [vp]);
+  const runs = useMemo(() => iclamp(md, ip, DT, 5), [md, ip]);
+  const runsStock = useMemo(() => iclamp(STOCK_MODEL, ip, DT, 5), [ip]);
+  // current clamp with several sweeps: Step walks them; with one sweep, it walks pulses up to threshold and across it
+  const family = ip.sweeps > 1;
 
-  // the pulses to step through: even steps up to this cell's threshold, then across it; or your own
   // The pulses around threshold are built from the cell as it was when stepping began (or was re-centered), so moving
   // a slider changes the cell, not the stimulus: pick a pulse just under threshold, then see what a parameter does to it.
   const [ladderP, setLadderP] = useState<Params | null>(null);
   const pinned = ladderP ?? p;
+  // a hyperpolarizing pulse (anode break) is scaled the same way, downward
+  const sgn = pulseAmp(ip) < 0 ? -1 : 1;
   const ladderBase = useMemo(() => {
-    if (!stepping || tab !== "spike") return null;
-    if (ladderSpec) return { thr0: null, base: evenLadder(ladderSpec.first, ladderSpec.by, ladderSpec.count) };
-    const st = { ...stim, sweep: sweepMs };
+    if (!stepping || tab !== "spike" || family) return null;
     const m0 = buildModel(pinned);
-    const thr0 = pulseThreshold(m0, st, settle(m0, st.hold, SETTLE_MS, DT), DT);
-    return { thr0, base: thresholdLadder(thr0, st.amp) };
-  }, [pinned, stim, sweepMs, stepping, tab, ladderSpec]);
+    const thr0 = thresholdP(m0, ip, settle(m0, ip.epochs[0].level, SETTLE_MS, DT), DT);
+    return { thr0, base: thresholdLadder(thr0 === null ? null : Math.abs(thr0), Math.abs(pulseAmp(ip))) };
+  }, [pinned, ip, stepping, tab, family]);
   // the cell has moved since the pulses were built around its threshold
-  const moved = !ladderSpec && ladderP !== null && JSON.stringify(ladderP) !== JSON.stringify(p);
+  const moved = ladderP !== null && JSON.stringify(ladderP) !== JSON.stringify(p);
   const ladder = useMemo(() => {
     if (!ladderBase) return null;
-    const st = { ...stim, sweep: sweepMs };
-    const from = settle(md, st.hold, SETTLE_MS, DT);
-    const thr = moved || ladderSpec ? pulseThreshold(md, st, from, DT) : ladderBase.thr0;
-    const rungs = ladderBase.base.map((r) => ({
-      ...r,
-      fired: fires(md, { ...st, amp: r.amp }, from, DT),
-      run: freeRun(md, { ...st, amp: r.amp }, from, DT, 5),
-    }));
+    const from = settle(md, ip.epochs[0].level, SETTLE_MS, DT);
+    const thr = moved ? thresholdP(md, ip, from, DT) : ladderBase.thr0;
+    const rungs = ladderBase.base.map((r) => {
+      const q = withPulse(ip, sgn * r.amp);
+      return { ...r, amp: sgn * r.amp, fired: firesP(md, q, from, DT), run: iclampSweep(md, q, 0, DT, 5, from) };
+    });
     return { thr, thr0: ladderBase.thr0, rungs };
-  }, [md, ladderBase, moved, ladderSpec, stim, sweepMs]);
+  }, [md, ladderBase, moved, ip, sgn]);
   const recenter = () => setLadderP(p);
-  // the even part of the threshold ladder, as a starting point for your own
-  const autoSpec = useMemo((): LadderSpec | null => {
-    if (sel !== "proto") return null;
-    const st = { ...stim, sweep: sweepMs };
-    const thr = pulseThreshold(md, st, settle(md, st.hold, SETTLE_MS, DT), DT);
-    if (thr === null) { const a = Math.abs(stim.amp || 1) / 4; return { first: a, by: a, count: 4 }; }
-    const d = niceStep(thr / 6);
-    return { first: d, by: d, count: Math.floor(thr / d) + 2 };
-  }, [sel, md, stim, sweepMs]);
-  const nSteps = tab === "clamp" ? fam.length : ladder?.rungs.length ?? 1;
+  const nSteps = tab === "clamp" ? fam.length : ladder ? ladder.rungs.length : runs.length;
   const k = Math.min(tab === "clamp" ? clampK : spikeK, nSteps - 1);
   const go = (d: number) => (tab === "clamp" ? setClampK : setSpikeK)(Math.max(0, Math.min(nSteps - 1, k + d)));
   const rung = ladder ? ladder.rungs[k] : null;
   const rungAmp = rung?.amp;
   const rungStock = useMemo(
-    () => (rungAmp === undefined ? null : spike(STOCK_MODEL, { ...stim, sweep: sweepMs, amp: rungAmp })),
-    [rungAmp, stim, sweepMs],
+    () => (rungAmp === undefined ? null : iclampSweep(STOCK_MODEL, withPulse(ip, rungAmp), 0, DT, 5)),
+    [rungAmp, ip],
   );
-  const apShown = rung ? rung.run : ap;
-  const apStockShown = rungStock ?? apStock;
+  // the current-clamp sweep whose currents are drawn: the one stepped to, or the last
+  const ri = stepping ? Math.min(k, runs.length - 1) : runs.length - 1;
+  const apShown = rung ? rung.run : runs[ri];
+  const apStockShown = rungStock ?? runsStock[ri];
   // arrow keys, Page Up and Page Down (what a presentation clicker sends) step too, unless a control has the keys
   const goRef = useRef(go);
   goRef.current = go;
@@ -266,7 +264,7 @@ function Main({ onRetro }: { onRetro: () => void }) {
     if (s === "na") return p.gNa !== STOCK.gNa || p.eNa !== STOCK.eNa || p.pm !== STOCK.pm || p.ph !== STOCK.ph;
     if (s === "k") return p.gK !== STOCK.gK || p.eK !== STOCK.eK || p.pn !== STOCK.pn;
     if (s === "mem") return p.celsius !== STOCK.celsius || p.gL !== STOCK.gL || p.eL !== STOCK.eL || p.cm !== STOCK.cm;
-    return JSON.stringify(clamp) !== JSON.stringify(DEFAULT_CLAMP) || JSON.stringify(stim) !== JSON.stringify(DEFAULT_STIM) || ladderSpec !== null;
+    return !same(vp, DEFAULT_V) || !same(ip, DEFAULT_I);
   };
   const anyEdited = (["m", "h", "n", "na", "k", "mem", "proto"] as Sel[]).some(edited);
 
@@ -365,8 +363,8 @@ function Main({ onRetro }: { onRetro: () => void }) {
     return [lo, hi];
   };
   // one horizontal zoom per experiment, shared by every plot on its time axis
-  const clampFull: Range = [0, clamp.pre + clamp.dur];
-  const spikeFull: Range = [0, sweepMs];
+  const clampFull: Range = [0, longestSweep(vp)];
+  const spikeFull: Range = [0, longestSweep(ip)];
   // the reset lives in the caption, not over a plot
   const clampZoom = { view: clampView(clampX ?? clampFull, clampFull, 0.5), onView: setClampX, minSpan: 0.5, button: false };
   const spikeZoom = { view: clampView(spikeX ?? spikeFull, spikeFull, 1), onView: setSpikeX, minSpan: 1, button: false };
@@ -397,13 +395,17 @@ function Main({ onRetro }: { onRetro: () => void }) {
     if (best >= 0 && !stepping) setClampPick(best);
     setClampT(t);
   };
-  const onClampStrip = (t: number, y?: number) => (y === undefined || t <= clamp.pre ? setClampT(t) : nearestSweep(t, y, (j) => fam[j].v));
+  const commandAt = (j: number, t: number) => sweepEpochs(vp, j)[epochAtTime(vp, j, t)].level;
+  const onClampStrip = (t: number, y?: number) => (y === undefined ? setClampT(t) : nearestSweep(t, y, (j) => commandAt(j, t)));
   const clampCursor = measure ? { cursor: clampT ?? undefined } : {};
   const spikeCursor = measure ? { cursor: spikeT ?? undefined, onCursor: (t: number) => setSpikeT(t) } : {};
   const toggleMeasure = () => { setMeasure(!measure); setClampT(null); setSpikeT(null); setClampPick(null); };
 
   // the protocol strip: what the experimenter commands, on the traces' time axis
-  const steps = fam.map((s) => s.v);
+  const vLines = fam.map((s) => commandLine(vp, s.k));
+  // current clamp: the pulses of the threshold ladder, or the protocol's own sweeps
+  const iLines = ladder ? ladder.rungs.map((r) => commandLine(withPulse(ip, r.amp), 0)) : runs.map((r) => commandLine(ip, r.k));
+  const iMany = iLines.length > 1;
   const protocol =
     tab === "clamp" ? (
       <Plot
@@ -414,11 +416,11 @@ function Main({ onRetro }: { onRetro: () => void }) {
         {...clampCursor}
         onCursor={measure ? onClampStrip : undefined}
         noXTicks
-        yInclude={[clamp.hold, clamp.from, clamp.to]}
-        yLabel={`command V (mV): hold ${fmt(clamp.hold)}, steps ${fmt(clamp.from)} to ${fmt(clamp.to)} by ${fmt(clamp.by)}`}
-        series={upTo(steps).map((v, j) => ({
-          x: [0, clamp.pre, clamp.pre, clamp.pre + clamp.dur],
-          y: [clamp.hold, clamp.hold, v, v],
+        yInclude={vLines.flatMap((l) => l.y)}
+        yLabel={`command V (mV): ${protocolWords(vp)}`}
+        series={upTo(vLines).map((l, j) => ({
+          x: l.x,
+          y: l.y,
           color: C.ink,
           width: bold(j) ?? (measure && clampT !== null && j === mi ? 2.2 : 1.2),
           opacity: measure && clampT !== null && j === mi ? 1 : fade(j),
@@ -432,38 +434,43 @@ function Main({ onRetro }: { onRetro: () => void }) {
         zoom={spikeZoom}
         {...spikeCursor}
         noXTicks
-        yInclude={[0, stim.hold, ...(ladder ? ladder.rungs.map((r) => stim.hold + r.amp) : [stim.hold + stim.amp])]}
-        yLabel={`injected I (µA/cm²): ${fmt(rungAmp ?? stim.amp)} for ${fmt(stim.dur)} ms at ${fmt(stim.start)} ms`}
-        series={(ladder ? ladder.rungs.slice(0, k + 1).map((r) => r.amp) : [stim.amp]).map((a, j) => ({
-          x: [0, stim.start, stim.start, stim.start + stim.dur, stim.start + stim.dur, sweepMs],
-          y: [stim.hold, stim.hold, stim.hold + a, stim.hold + a, stim.hold, stim.hold],
+        yInclude={[0, ...iLines.flatMap((l) => l.y)]}
+        yLabel={`injected I (µA/cm²): ${rungAmp !== undefined ? `pulse ${fmt(rungAmp)}` : protocolWords(ip)}`}
+        series={(stepping ? iLines.slice(0, k + 1) : iLines).map((l, j) => ({
+          x: l.x,
+          y: l.y,
           color: C.ink,
-          width: ladder ? bold(j) ?? 1.2 : 1.4,
-          opacity: ladder ? fade(j) : 1,
+          width: iMany ? (stepping ? bold(j) ?? 1.2 : j === iLines.length - 1 ? 1.6 : 1.2) : 1.4,
+          opacity: iMany ? (stepping ? fade(j) : j === iLines.length - 1 ? 1 : 0.3) : 1,
         }))}
       />
     );
+  // the I–V's x axis: whatever changes from sweep to sweep
+  const sw = swept(vp);
+  const ivX = !sw ? "sweep" : sw.what === "dur" ? `${LETTERS[sw.epoch]} duration (ms)` : sw.epoch === vp.measure ? "test potential (mV)" : `${LETTERS[sw.epoch]} potential (mV)`;
 
   let simPlot;
   if (tab === "clamp") {
     if (iv) {
       // stepping builds the curve a point at a time, on the axes the whole family needs
-      const vs = upTo(fam.map((s) => s.v));
+      const vs = upTo(fam.map((s) => s.x));
+      const xs = fam.map((s) => s.x);
+      const x0 = Math.min(...xs), x1 = Math.max(...xs), pad = Math.max(0.05 * (x1 - x0), sw?.what === "level" ? 5 : 0.5);
       // peak INa and IK at the end of the step; or peak gNa and gK at the end
-      const ivOf = (s: ClampSweep, which: "iNaPeak" | "iKEnd") =>
-        !clampG ? s[which] / 1000 : which === "iNaPeak" ? Math.max(...s.gNa) : s.gK[s.gK.length - 1];
+      const ivOf = (s: (typeof fam)[number], which: "iNaPeak" | "iKEnd") =>
+        !clampG ? s[which] / 1000 : which === "iNaPeak" ? s.gNaPeak : s.gKEnd;
       const pk = (f: typeof fam, which: "iNaPeak" | "iKEnd") => upTo(f.map((s) => ivOf(s, which)));
       simPlot = (
         <Plot
           height={H.sim}
           ariaLabel={clampG ? "conductance-voltage relation" : "current-voltage relation"}
-          x={[clamp.from - 5, clamp.to + 5]}
+          x={[x0 - pad, x1 + pad]}
           zeroLine
           yInclude={extent([fam, famStock].flatMap((f) => [
             ...(clampCur.includes("iNa") ? [f.map((s) => ivOf(s, "iNaPeak"))] : []),
             ...(clampCur.includes("iK") ? [f.map((s) => ivOf(s, "iKEnd"))] : []),
           ]))}
-          xLabel="test potential (mV)"
+          xLabel={ivX}
           yLabel={clampG ? "g (mS/cm²)" : "I (mA/cm²)"}
           series={[
             ...(clampCur.includes("iNa") ? [{ x: vs, y: pk(famStock, "iNaPeak"), color: C.stock, width: 3 }] : []),
@@ -533,7 +540,8 @@ function Main({ onRetro }: { onRetro: () => void }) {
           series={[
             { x: apStock.t, y: apStock.v, color: C.stock, width: 3 },
             ...(ladder ? ladder.rungs.slice(0, k).map((r) => ({ x: r.run.t, y: r.run.v, color: C.ink, width: 1.2, opacity: 0.25 }) as Series) : []),
-            { x: ap.t, y: ap.v, color: C.ink, label: "V", width: ladder ? 2.2 : undefined },
+            ...(family ? runs.slice(0, ri).map((r) => ({ x: r.t, y: r.v, color: C.ink, width: 1.2, opacity: 0.25 }) as Series) : []),
+            { x: ap.t, y: ap.v, color: C.ink, label: "V", width: ladder || family ? 2.2 : undefined },
           ]}
         />
         <Plot
@@ -558,9 +566,9 @@ function Main({ onRetro }: { onRetro: () => void }) {
   if (measure && tab === "clamp" && !iv) {
     if (clampT === null) reading = mouse ? "Click a trace to measure it; drag the line to move." : "Tap a trace to measure it; drag the line to move.";
     else {
-      const sw = fam[mi], t = clampT;
-      const cur = (["iNa", "iK"] as Cur[]).map((c) => `${cqLabel(c)} ${fmt(valAt(sw.t, cq(sw, c), t))}`).join(", ");
-      reading = `t ${fmt(t)} ms · ${t > clamp.pre ? `step to ${fmt(sw.v)}` : `hold ${fmt(clamp.hold)}`} mV · ${cur} ${cqUnit}`;
+      const s = fam[mi], t = clampT;
+      const cur = (["iNa", "iK"] as Cur[]).map((c) => `${cqLabel(c)} ${fmt(valAt(s.t, cq(s, c), t))}`).join(", ");
+      reading = `t ${fmt(t)} ms · ${LETTERS[epochAtTime(vp, s.k, t)]} at ${fmt(commandAt(s.k, t))} mV · ${cur} ${cqUnit}`;
     }
   } else if (measure && tab === "spike") {
     if (spikeT === null) reading = mouse ? "Click the traces to measure; drag the line to move." : "Tap the traces to measure; drag the line to move.";
@@ -578,7 +586,11 @@ function Main({ onRetro }: { onRetro: () => void }) {
   // what this step is, in words
   let stepText = "";
   if (stepping && tab === "clamp") {
-    stepText = `Step ${k + 1} of ${nSteps}: ${fmt(clamp.hold)} → ${fmt(fam[k].v)} mV`;
+    const w = sweepWords(vp, k);
+    stepText = `Sweep ${k + 1} of ${nSteps}${w ? `: ${w}` : ""}`;
+  } else if (stepping && family) {
+    const w = sweepWords(ip, k), n = spikeTimes(runs[k].t, runs[k].v).length;
+    stepText = `Sweep ${k + 1} of ${nSteps}${w ? `: ${w}` : ""}, ${n === 0 ? "no spike" : n === 1 ? "1 spike" : `${n} spikes`}`;
   } else if (stepping && ladder) {
     const r = ladder.rungs[k];
     const head = `Pulse ${k + 1} of ${nSteps}: ${fmt(r.amp)} µA/cm², ${r.fired ? "spike" : "no spike"}`;
@@ -687,43 +699,19 @@ function Main({ onRetro }: { onRetro: () => void }) {
       </fieldset>
     );
   } else {
+    const v = tab === "clamp";
     controls = (
-      <>
-        <fieldset className="group">
-          <legend className="formula">Voltage clamp: hold, then {testPotentials(clamp).length} steps from {fmt(clamp.from)} to {fmt(clamp.to)} mV by {fmt(clamp.by)}</legend>
-          <Slider label="holding potential" unit="mV" value={clamp.hold} min={-120} max={-30} step={1} stock={DEFAULT_CLAMP.hold} onChange={(v) => setClamp({ ...clamp, hold: v })} />
-          <Slider label="first step" unit="mV" value={clamp.from} min={-120} max={80} step={1} stock={DEFAULT_CLAMP.from} onChange={(v) => setClamp({ ...clamp, from: Math.min(v, clamp.to) })} />
-          <Slider label="last step" unit="mV" value={clamp.to} min={-120} max={80} step={1} stock={DEFAULT_CLAMP.to} onChange={(v) => setClamp({ ...clamp, to: Math.max(v, clamp.from) })} />
-          <Slider label="step spacing" unit="mV" value={clamp.by} min={1} max={50} step={1} stock={DEFAULT_CLAMP.by} onChange={(v) => setClamp({ ...clamp, by: Math.max(1, v) })} />
-          <Slider label="step length" unit="ms" value={clamp.dur} min={2} max={50} step={1} stock={DEFAULT_CLAMP.dur} onChange={(v) => setClamp({ ...clamp, dur: v })} />
-        </fieldset>
-        <fieldset className="group">
-          <legend className="formula">Action potential: a current pulse at {fmt(stim.start)} ms</legend>
-          <Slider label="pulse amplitude" unit="µA/cm²" value={stim.amp} min={-50} max={200} step={0.5} stock={DEFAULT_STIM.amp} onChange={(v) => setStim({ ...stim, amp: v })} />
-          <Slider label="pulse length" unit="ms" value={stim.dur} min={0.05} max={50} log stock={DEFAULT_STIM.dur} onChange={(v) => setStim({ ...stim, dur: v })} />
-          <Slider label="holding current" unit="µA/cm²" value={stim.hold} min={-20} max={20} step={0.1} stock={DEFAULT_STIM.hold} onChange={(v) => setStim({ ...stim, hold: v })} />
-        </fieldset>
-        <fieldset className="group">
-          <legend className="formula">
-            Step through the action potential:{" "}
-            {ladderSpec
-              ? `${fmt(ladderSpec.count)} pulses, ${fmt(ladderSpec.first)} to ${fmt(ladderSpec.first + (ladderSpec.count - 1) * ladderSpec.by)} µA/cm²`
-              : "even steps up to threshold, then 1% under, 1% over, twice"}
-          </legend>
-          <div className="ladder-pick" role="radiogroup" aria-label="pulses to step through">
-            <button role="radio" aria-checked={!ladderSpec} className={!ladderSpec ? "on" : ""} onClick={() => { setLadderSpec(null); setLadderP(p); }}>Around threshold</button>
-            <button role="radio" aria-checked={!!ladderSpec} className={ladderSpec ? "on" : ""} onClick={() => !ladderSpec && autoSpec && setLadderSpec(autoSpec)}>My own</button>
-          </div>
-          {ladderSpec && autoSpec && (
-            <>
-              <Slider label="first pulse" unit="µA/cm²" value={ladderSpec.first} min={0} max={200} step={0.1} stock={autoSpec.first} onChange={(v) => setLadderSpec({ ...ladderSpec, first: v })} />
-              <Slider label="step size" unit="µA/cm²" value={ladderSpec.by} min={-50} max={50} step={0.1} stock={autoSpec.by} onChange={(v) => setLadderSpec({ ...ladderSpec, by: v })} />
-              <Slider label="pulses" value={ladderSpec.count} min={2} max={20} integer stock={autoSpec.count} onChange={(v) => setLadderSpec({ ...ladderSpec, count: v })} />
-            </>
-          )}
-          <p className="hint">Pulse length and holding current come from above. Turn on Step over the traces to walk through them.</p>
-        </fieldset>
-      </>
+      <ProtocolEditor
+        mode={v ? "v" : "i"}
+        onMode={(m) => { setTab(m === "v" ? "clamp" : "spike"); setSelEp(1); }}
+        p={v ? vp : ip}
+        setP={v ? setVp : setIp}
+        presets={v ? V_PRESETS : I_PRESETS}
+        base={v ? vBase : iBase}
+        setBase={(b) => { (v ? setVBase : setIBase)(b); (v ? setClampK : setSpikeK)(0); }}
+        sel={selEp}
+        setSel={setSelEp}
+      />
     );
   }
 
@@ -732,7 +720,7 @@ function Main({ onRetro }: { onRetro: () => void }) {
     else if (sel === "na") setP({ ...p, gNa: STOCK.gNa, eNa: STOCK.eNa, pm: STOCK.pm, ph: STOCK.ph });
     else if (sel === "k") setP({ ...p, gK: STOCK.gK, eK: STOCK.eK, pn: STOCK.pn });
     else if (sel === "mem") setP({ ...p, celsius: STOCK.celsius, gL: STOCK.gL, eL: STOCK.eL, cm: STOCK.cm });
-    else { setClamp(DEFAULT_CLAMP); setStim(DEFAULT_STIM); setLadderSpec(null); }
+    else { setVp(DEFAULT_V); setIp(DEFAULT_I); setVBase(DEFAULT_V); setIBase(DEFAULT_I); }
   };
 
   const chips: { id: Sel; label: string }[] = [
@@ -872,7 +860,7 @@ function Main({ onRetro }: { onRetro: () => void }) {
           {controls}
           <div className="resets" {...tour("Reset", "Put one thing back, or everything.")}>
             <button onClick={resetSel} disabled={!edited(sel)}>Reset {chips.find((c) => c.id === sel)!.label}</button>
-            <button onClick={() => { setP(stockParams()); setClamp(DEFAULT_CLAMP); setStim(DEFAULT_STIM); setLadderSpec(null); }} disabled={!anyEdited}>Reset all</button>
+            <button onClick={() => { setP(stockParams()); setVp(DEFAULT_V); setIp(DEFAULT_I); setVBase(DEFAULT_V); setIBase(DEFAULT_I); }} disabled={!anyEdited}>Reset all</button>
           </div>
         </div>
       </aside>

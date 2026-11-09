@@ -162,10 +162,14 @@ export interface FreeSweep {
  * t = i·dt) is the stimulus if start ≤ t < start + dur, as in gaba_excites.
  */
 export function freeRun(md: Model, stim: Stimulus, from: State, dt: number, every = 1): FreeSweep {
-  const { p } = md;
-  const nSteps = Math.round(stim.sweep / dt);
-  const nOut = Math.floor(nSteps / every) + 1;
   const iOn = Math.round(stim.start / dt), iOff = Math.round((stim.start + stim.dur) / dt);
+  return runInjected(md, Math.round(stim.sweep / dt), (i) => stim.hold + (i >= iOn && i < iOff ? stim.amp : 0), stim.hold, from, dt, every);
+}
+
+/** `nSteps` steps of dt from `from`, injecting `inj(i)` µA/cm² in step i; recorded every `every` steps, the first at t = 0 with `i0` */
+export function runInjected(md: Model, nSteps: number, inj: (i: number) => number, i0: number, from: State, dt: number, every = 1): FreeSweep {
+  const { p } = md;
+  const nOut = Math.floor(nSteps / every) + 1;
   const out: FreeSweep = {
     t: new Float64Array(nOut), v: new Float64Array(nOut), iNa: new Float64Array(nOut), iK: new Float64Array(nOut),
     gNa: new Float64Array(nOut), gK: new Float64Array(nOut), m: new Float64Array(nOut), h: new Float64Array(nOut),
@@ -180,9 +184,9 @@ export function freeRun(md: Model, stim: Stimulus, from: State, dt: number, ever
     out.iNa[j] = gna * (s.v - p.eNa); out.iK[j] = gk * (s.v - p.eK);
     out.iStim[j] = i;
   };
-  record(0, 0, stim.hold);
+  record(0, 0, i0);
   for (let i = 1; i <= nSteps; i++) {
-    const iInj = stim.hold + (i >= iOn && i < iOff ? stim.amp : 0);
+    const iInj = inj(i);
     step(md, s, iInj, dt);
     if (i % every === 0) record(i / every, i * dt, iInj);
   }

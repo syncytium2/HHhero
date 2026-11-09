@@ -371,3 +371,31 @@ audit is clean. Only the test runner changed: Vite, esbuild, React, the
 React plugin, wrangler and TypeScript are at the same versions, so the
 deploy's rebuilds of the earlier releases are unaffected. The suite,
 including the NEURON check, passes unchanged.
+## 2026-11-09: a protocol builder
+
+The owner, after the inactivation paper: "a general protocol builder (~5
+epochs?), rather than 'we're missing one, let's add one'", on the main screen
+too, with current clamp and a mode toggle. `src/core/protocol.ts` writes a
+protocol as pClamp does: up to five epochs, each a level held for a time,
+either of which can change by a fixed amount from sweep to sweep; the first
+epoch is the hold. One protocol type serves both modes: a level is a command
+potential in voltage clamp and an injected current in current clamp.
+Voltage clamp stays a formula (each gate relaxes exactly within an epoch,
+from where the last left it), and the stock protocol is the old step family
+to the bit; the stock current-clamp protocol is the old pulse to the bit, and
+`freeRun` is now a wrapper over the same integrator (`runInjected`), so the
+NEURON test still covers it. The I–V reads a chosen epoch and plots it
+against whatever changes from sweep to sweep, so the same plot gives h∞
+(Inactivation) and recovery (Recovery). Stock protocols: Steps, Inactivation,
+Recovery and Tails in voltage clamp; Pulse, Two pulses, Anode break and Long
+step in current clamp. Each preset's sentence is tested
+(`protocol.test.ts`); Two pulses and Long step were tuned to the model
+(at 6.3 °C a second 20 µA/cm² pulse fails until about 13 ms).
+
+On the phone the panel shows one epoch's sliders at a time, picked by its
+letter, with the presets and the mode below, so a slider stays on screen
+with the traces in Focus. "My own" pulses are gone: a protocol with several
+sweeps is stepped sweep by sweep, and with one sweep Step still walks pulses
+up to threshold and across it, now by scaling the protocol's pulse (the
+epoch furthest from the hold, downward for anode break). The step text says
+"Sweep" where it said "Step". Not yet on the 1952 screen.
