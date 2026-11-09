@@ -35,6 +35,11 @@ between the two. One model, two sets of controls. The core is `src/core/`
   `src/paper/` and a review image (the trace over the printed figure) to a
   directory outside the repository: the image embeds the scan, so never
   commit it. Run the tracers with numpy, pillow, scipy and pymupdf.
+  A printed table in a scanned paper (all the 1952 ones) is read from the
+  page image, not pdftotext, whose text is OCR: armory's
+  `tools/litreview/page_images.py` renders the page by its printed number in
+  readable bands. Read it twice, blind, and compare every cell
+  (`lit/notes/hodgkin1952d.md`, Table 1).
 - **Every control gets a tour caption.** The Tour (`src/ui/Tour.tsx`) knows
   no features: it walks whatever carries `{...tour(title, text)}` in page
   order and shows each working (toggles pressed and released, picks chosen
