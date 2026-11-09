@@ -25,7 +25,12 @@ gives both scales).
 
 ## Table 1 (p. 503), "Experiments with conditioning voltage"
 
-Transcribed by eye from the page rendered at 300 dpi (pymupdf), 2026-11-09: the PDF's text layer is an OCR of
+Read twice, blind, 2026-11-09, from the page rendered at 300 dpi and cut into bands (armory's
+`tools/litreview/page_images.py`): the two readings agree on all 180 cells. The −8 and −7 columns sit close
+together; the second reader placed them by method, as the first did: the Figs. 4–5 rows use −7, the Figs. 1–3 rows
+and both τh groups use −8.
+
+Why from the image: the PDF's text layer is an OCR of
 the scan and garbles this table, so pdftotext (and armory's litreview tools, which use it) cannot be trusted
 here. — is the paper's dash (not measured); [ ] is the paper's "interpolated". † "the axon had been used for
 some time and was in poor condition". V is the displacement from rest, depolarization negative.
