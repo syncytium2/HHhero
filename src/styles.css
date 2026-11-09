@@ -156,7 +156,9 @@ a { color: inherit; }
 .app:not(.wide) .sim .card-head { gap: 4px; }
 .app:not(.wide) .sim .tabs.small button { min-width: 36px; padding: 0 6px; }
 .app:not(.wide) .sim .tabs button { padding: 0 6px; }
-.app:not(.wide) .iv-btn { margin-left: 2px; }
+.app:not(.wide) .iv-btn { margin-left: 0; }
+/* the clamp header is seven buttons on one row at 360 px with about a pixel to spare: these gaps give it six */
+.app:not(.wide) .sim .tabs { gap: 3px; }
 
 /* ---- 1952: the model paper on a green-phosphor tube (laptop first) ----
    gaba_excites' Old school palette: dark enamel, cream engraving, amber indicators. */
