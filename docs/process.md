@@ -360,3 +360,14 @@ recovery from inactivation measured at τ ≈ 12 ms at 4.5 °C, against the
 model's 10.4 ms, with a test. Its other figures (conditioning then test,
 the steady-state curve, two pulses) need a clamp of more than one step;
 see the roadmap.
+
+## 2026-11-09: vitest 4
+
+`npm audit` reported 6 warnings (3 moderate, 1 high, 2 critical), all from
+vitest 2.1.9 and the second Vite (5.4.21, esbuild 0.21.5) it carried for
+tests. None shipped: the site is built and served by the app's own Vite
+6.4.5. vitest 4.1.12 shares that Vite, so the second copy is gone and the
+audit is clean. Only the test runner changed: Vite, esbuild, React, the
+React plugin, wrangler and TypeScript are at the same versions, so the
+deploy's rebuilds of the earlier releases are unaffected. The suite,
+including the NEURON check, passes unchanged.
