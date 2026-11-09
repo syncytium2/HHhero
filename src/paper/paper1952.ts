@@ -244,6 +244,10 @@ export const FIGURES: Figure[] = [
         text: "And h, the fraction of sodium channels not inactivated, falls during the spike and recovers only slowly. Until h comes back, a second shock finds few sodium channels to open: the refractory period. Both curves return near the end of the positive phase.",
         rig: { ap: ["gK", "h"] },
       },
+      {
+        text: "That slow recovery was measured, not assumed. Earlier the same year, Hodgkin and Huxley gave two clamp pulses in quick succession: the sodium current of the second came back with a time constant of about 12 ms at 4.5 °C (J Physiol 116:497, Fig. 7). The model's h recovers at rest with a time constant of about 10 ms at that temperature.",
+        rig: { ap: ["gK", "h"] },
+      },
     ],
     check: (r) => {
       if (r.kind !== "shock") return { ok: false, hint: "Fig. 19 is a membrane action potential: start it with a shock." };

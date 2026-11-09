@@ -436,3 +436,80 @@ for a while, unplanned, and the check had been failing on it.
 Room: the second row on a 360 px phone has space for about one more short
 segment. Onset of inactivation and recovery make four protocols; when they
 come, the switch needs its own row or shorter names.
+## 2026-11-09: the inactivation paper
+
+The owner found the PDFs of Hodgkin & Huxley 1952a (116:449, currents
+carried by sodium and potassium) and 1952d (116:497, the dual effect:
+inactivation). Both are now in `lit/sources.json` (DOIs and PMIDs checked
+against PubMed) and in `lit/pdf/` on the Mac, uncommitted. 1952d does not
+change the model: the model paper's h was fitted to it, and its h∞ and τh
+still agree. Its first form of h is a steady-state curve with a time
+constant (eqn. 1, a Boltzmann with a 7 mV slope), which is the x∞, τ view
+this site is about. The Fig. 19 walk now ends on its two-pulse experiment:
+recovery from inactivation measured at τ ≈ 12 ms at 4.5 °C, against the
+model's 10.4 ms, with a test. Its other figures (conditioning then test,
+the steady-state curve, two pulses) need a clamp of more than one step;
+see the roadmap.
+
+## 2026-11-09: vitest 4
+
+`npm audit` reported 6 warnings (3 moderate, 1 high, 2 critical), all from
+vitest 2.1.9 and the second Vite (5.4.21, esbuild 0.21.5) it carried for
+tests. None shipped: the site is built and served by the app's own Vite
+6.4.5. vitest 4.1.12 shares that Vite, so the second copy is gone and the
+audit is clean. Only the test runner changed: Vite, esbuild, React, the
+React plugin, wrangler and TypeScript are at the same versions, so the
+deploy's rebuilds of the earlier releases are unaffected. The suite,
+including the NEURON check, passes unchanged.
+## 2026-11-09: a protocol builder
+
+The owner, after the inactivation paper: "a general protocol builder (~5
+epochs?), rather than 'we're missing one, let's add one'", on the main screen
+too, with current clamp and a mode toggle. `src/core/protocol.ts` writes a
+protocol as pClamp does: up to five epochs, each a level held for a time,
+either of which can change by a fixed amount from sweep to sweep; the first
+epoch is the hold. One protocol type serves both modes: a level is a command
+potential in voltage clamp and an injected current in current clamp.
+Voltage clamp stays a formula (each gate relaxes exactly within an epoch,
+from where the last left it), and the stock protocol is the old step family
+to the bit; the stock current-clamp protocol is the old pulse to the bit, and
+`freeRun` is now a wrapper over the same integrator (`runInjected`), so the
+NEURON test still covers it. The I–V reads a chosen epoch and plots it
+against whatever changes from sweep to sweep, so the same plot gives h∞
+(Inactivation) and recovery (Recovery). Stock protocols: Steps, Inactivation,
+Recovery and Tails in voltage clamp; Pulse, Two pulses, Anode break and Long
+step in current clamp. Each preset's sentence is tested
+(`protocol.test.ts`); Two pulses and Long step were tuned to the model
+(at 6.3 °C a second 20 µA/cm² pulse fails until about 13 ms).
+
+On the phone the panel shows one epoch's sliders at a time, picked by its
+letter, with the presets and the mode below, so a slider stays on screen
+with the traces in Focus. "My own" pulses are gone: a protocol with several
+sweeps is stepped sweep by sweep, and with one sweep Step still walks pulses
+up to threshold and across it, now by scaling the protocol's pulse (the
+epoch furthest from the hold, downward for anode break). The step text says
+"Sweep" where it said "Step". Not yet on the 1952 screen.
+
+## 2026-11-09: the two lines joined
+
+Two sessions built protocol work apart: on the mini (7 Nov, branch
+`inactivation`: the dev site, the inactivation protocol with h–V, the
+Act | Inact switch) and on the Mac (9 Nov: the general protocol builder,
+vitest 4, the inactivation paper). The dev site and its rule ("features go
+to a branch; main stays what is live") never reached GitHub's main, so the
+Mac session pushed its work to main. With the owner's go-ahead, main was put
+back to v0.1.10 (5d8b21c), the Mac's work kept as `mac-nov9`, and the two
+joined on this branch.
+
+One protocol system, the builder. The 7 Nov inactivation protocol is its
+Inactivation preset, sampled the same way (each epoch from its own start,
+sparse late in a long prepulse), and a test holds it to sim.ts's
+`clampFamily(DEFAULT_INACT)` to the bit, so the 7 Nov tests and notes still
+describe what the screen shows. A protocol that sweeps a prepulse ahead of
+the measured epoch is drawn as h–V, with the 7 Nov plot and note. The
+header's Act | Inact picks the Steps or Inactivation preset; on a phone the
+clamp header is two rows, as decided 7 Nov. Changed from 7 Nov: switching
+Act and Inact starts the chosen protocol fresh rather than keeping each
+one's edits, because a protocol is now one set of epochs. Recovery and
+onset of inactivation, which 7 Nov expected to join the switch, are
+presets in Protocol.

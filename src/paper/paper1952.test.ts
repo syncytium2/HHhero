@@ -1,6 +1,7 @@
 // The 1952 screen's claims, held to the model and to the paper. Every sentence the guide says about a
 // trace is checked here, as the notes are in views.test.ts.
 import { describe, expect, it } from "vitest";
+import { hhH, hhPhi } from "../core/reference.ts";
 import {
   clampStep, eqn11, FIG3_DATA, FIGURES, fromPaperV, guideRig, modelAt, paperI, paperV, REST, shock, spikeHeight,
   START_RIG, stepToText, TABLE4, textToStep,
@@ -116,6 +117,13 @@ describe("Fig. 19: gK and h after the spike", () => {
     // by 20 ms, both near rest
     expect(r.gK[i(19.9)]).toBeLessThan(gKmax * 0.1);
     expect(r.h[i(19.9)]).toBeGreaterThan(h0 * 0.8);
+  });
+  it("the model's h recovers at rest with a time constant of about 10 ms at 4.5 °C (the paper measured about 12)", () => {
+    // Hodgkin & Huxley 1952d (J Physiol 116:497), Fig. 7: recovery from inactivation, τ ≈ 12 ms, axon 31 at 4.5 °C
+    const tau = hhH(REST, hhPhi(4.5)).tau;
+    expect(tau).toBeGreaterThan(9.5);
+    expect(tau).toBeLessThan(11);
+    expect(Math.abs(tau - 12) / 12).toBeLessThan(0.2);
   });
 });
 

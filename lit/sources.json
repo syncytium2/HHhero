@@ -51,6 +51,52 @@
         "tools/neuron_oracle_hh.py",
         "src/core/hh.test.ts"
       ]
+    },
+    {
+      "key": "hodgkin1952a",
+      "type": "article",
+      "authors": [
+        "Hodgkin AL",
+        "Huxley AF"
+      ],
+      "year": 1952,
+      "journal": "J Physiol",
+      "volume": "116",
+      "issue": "4",
+      "access": "open",
+      "title": "Currents carried by sodium and potassium ions through the membrane of the giant axon of Loligo",
+      "pages": "449–472",
+      "doi": "10.1113/jphysiol.1952.sp004717",
+      "pmid": "14946713",
+      "pmcid": "PMC1392213",
+      "role": "background",
+      "took": "Nothing yet. Read for the 1952 screen's future clamp figures: the sodium and potassium currents separated by replacing sodium with choline, and the decline of sodium conductance during a held depolarization.",
+      "usedIn": []
+    },
+    {
+      "key": "hodgkin1952d",
+      "type": "article",
+      "authors": [
+        "Hodgkin AL",
+        "Huxley AF"
+      ],
+      "year": 1952,
+      "journal": "J Physiol",
+      "volume": "116",
+      "issue": "4",
+      "access": "open",
+      "title": "The dual effect of membrane potential on sodium conductance in the giant axon of Loligo",
+      "pages": "497–506",
+      "doi": "10.1113/jphysiol.1952.sp004719",
+      "pmid": "14946715",
+      "pmcid": "PMC1392212",
+      "role": "data",
+      "took": "Recovery from inactivation measured with two clamp pulses: τ ≈ 12 ms at 4.5 °C (Fig. 7, p. 504), cited in the Fig. 19 walk and checked against the model's τh at rest. Also h as a steady-state curve with a time constant (eqn. 1, p. 501; Table 1, p. 503).",
+      "usedIn": [
+        "src/paper/paper1952.ts",
+        "src/paper/paper1952.test.ts"
+      ],
+      "notes": "notes/hodgkin1952d.md"
     }
   ]
 }
