@@ -21,7 +21,7 @@ import { buildModel, stockParams, type Model, type Params } from "./core/model.t
 import { availability, settle, spikeTimes, thresholdLadder, type ClampSweep } from "./core/sim.ts";
 import {
   commandLine, DEFAULT_I, DEFAULT_V, epochAtTime, inactShaped, onsetShaped, timeCourse, firesP, I_PRESETS, iclamp, iclampSweep, LETTERS, longestSweep, pulseAmp, swept,
-  sweepEpochs, thresholdP, V_PRESETS, vclamp, withPulse, type Protocol,
+  sweepEpochs, thresholdP, V_PRESETS, vclamp, withPulse, type Preset, type Protocol,
 } from "./core/protocol.ts";
 import { ProtocolEditor, protocolWords } from "./ui/ProtocolEditor.tsx";
 import { hInfLabel, inactNote, noteFor, timeCourseNote, type View } from "./core/notes.ts";
@@ -103,6 +103,9 @@ const STOCK_CURVES = { m: curves(STOCK_MODEL, "m"), h: curves(STOCK_MODEL, "h"),
 
 const SETTLE_MS = 50, DT = 0.01;
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+/** the clamp header's experiments: two pairs of Protocol's stock protocols, by id, in header order */
+const EXPERIMENTS = Object.fromEntries((["steps", "hinf", "onset", "recovery"] as const).map((id) => [id, V_PRESETS.find((x) => x.id === id)!])) as Record<ExperimentId, Preset>;
+type ExperimentId = "steps" | "hinf" | "onset" | "recovery";
 /** what sweep k of a protocol is, in a few words: the swept epoch's value */
 function sweepWords(pr: Protocol, k: number): string {
   const s = swept(pr);
@@ -158,12 +161,11 @@ function Main({ onRetro }: { onRetro: () => void }) {
   const [vBase, setVBase] = useState<Protocol>(DEFAULT_V);
   const [iBase, setIBase] = useState<Protocol>(DEFAULT_I);
   const [selEp, setSelEp] = useState(1);
-  const INACT_PRESET = V_PRESETS.find((x) => x.id === "hinf")!.p;
-  const ONSET_PRESET = V_PRESETS.find((x) => x.id === "onset")!.p;
-  // The header's Act | Inact, with the traces / curve button, is a grid: Act shows the step family's
-  // currents (traces) or its I–V (curve); Inact shows the time course of inactivation (Onset) or its
-  // voltage dependence, h–V (Inactivation). Which is on follows the stock protocol the clamp last started from.
-  const actOn = same(vBase, V_PRESETS[0].p), inactOn = same(vBase, INACT_PRESET) || same(vBase, ONSET_PRESET);
+  // The header picks the experiment, in two pairs: voltage dependence (Act: the step family and its
+  // I–V; Inact: prepulses to a family of potentials and h–V) and time dependence (Inact: a prepulse
+  // of growing length; Recovery: a growing gap between two pulses), the time course drawn on the
+  // traces. The lit one is the protocol as it stands: an edit under Protocol unlights all four.
+  const experiment = (Object.keys(EXPERIMENTS) as ExperimentId[]).find((id) => same(vp, EXPERIMENTS[id].p)) ?? null;
   // a new protocol starts unzoomed, at its first sweep, with no cursor
   const pickV = (q: Protocol) => { setVp(q); setVBase(q); setSelEp(1); setClampK(0); setClampX(null); setClampT(null); setClampPick(null); };
   const [cursor, setCursor] = useState(-40);
@@ -416,8 +418,9 @@ function Main({ onRetro }: { onRetro: () => void }) {
   const inact = inactShaped(vp);
   // the time course of inactivation: an epoch lengthened sweep by sweep ahead of the measured one
   const onset = onsetShaped(vp);
-  const hv = inact || inactOn;
-  const tc = onset && !iv ? timeCourse(md, vp, fam, clampG) : null;
+  // the time experiments draw their curve on the traces; the voltage ones draw it instead of the traces, with the curve button
+  const tc = onset ? timeCourse(md, vp, fam, clampG) : null;
+  const curve = iv && !onset;
   const inactWords = (() => {
     const s = swept(vp), e = vp.epochs[s?.epoch ?? 0], last = sweepEpochs(vp, vp.sweeps - 1)[s?.epoch ?? 0];
     return `prepulses ${fmt(e.level)} to ${fmt(last.level)} by ${fmt(e.dLevel)}, then test ${fmt(vp.epochs[vp.measure].level)}`;
@@ -477,7 +480,7 @@ function Main({ onRetro }: { onRetro: () => void }) {
 
   let simPlot;
   if (tab === "clamp") {
-    if (iv && inact) {
+    if (curve && inact) {
       // inactivation: each prepulse's peak at the test step, over the largest, on the h∞ the model has
       const vs = upTo(fam.map((s) => s.x));
       const naOn = clampCur.includes("iNa"), kOn = clampCur.includes("iK");
@@ -508,7 +511,7 @@ function Main({ onRetro }: { onRetro: () => void }) {
           ]}
         />
       );
-    } else if (iv) {
+    } else if (curve) {
       // stepping builds the curve a point at a time, on the axes the whole family needs
       const vs = upTo(fam.map((s) => s.x));
       const xs = fam.map((s) => s.x);
@@ -776,6 +779,7 @@ function Main({ onRetro }: { onRetro: () => void }) {
         p={v ? vp : ip}
         setP={v ? setVp : setIp}
         presets={v ? V_PRESETS : I_PRESETS}
+        inHeader={v ? Object.keys(EXPERIMENTS) : []}
         base={v ? vBase : iBase}
         setBase={(b) => { (v ? setVBase : setIBase)(b); (v ? setClampK : setSpikeK)(0); }}
         sel={selEp}
@@ -864,14 +868,24 @@ function Main({ onRetro }: { onRetro: () => void }) {
             </span>
             <button className={`step-btn${stepping ? " on" : ""}`} aria-pressed={stepping} aria-label="step through" onClick={toggleStepping}
               {...tour("Step", "One sweep at a time, for teaching from the front of a room: the clamp family, or pulses up to threshold and across it. The arrow keys and a presentation clicker step too.", { then: "next step" })}>Step</button>
-            {tab === "clamp" && <span className="row-break" aria-hidden="true" />}
             {tab === "clamp" && (
-              // the clamp protocol, one tap from the traces: the Steps and Inactivation presets of Protocol
-              <span className="tabs proto-pick" role="radiogroup" aria-label="voltage-clamp protocol">
-                <button role="radio" aria-checked={actOn} aria-label="activation protocol" className={actOn ? "on" : ""} onClick={() => pickV(V_PRESETS[0].p)}
-                  {...tour("Act", "Activation: a family of steps from one holding potential. Sodium turns on, then off; potassium turns on.", { kind: "pick" })}>{wide ? "Activation" : "Act"}</button>
-                <button role="radio" aria-checked={inactOn} aria-label="inactivation protocol" className={inactOn ? "on" : ""} onClick={() => pickV(iv ? INACT_PRESET : ONSET_PRESET)}
-                  {...tour("Inact", "Inactivation: each sweep a different prepulse, then all step to one test potential. The sodium current left shows how many channels the prepulse inactivated; h–V plots it. Its epochs are under Protocol.", { kind: "pick" })}>{wide ? "Inactivation" : "Inact"}</button>
+              // the experiment, one tap from the traces: four of Protocol's stock protocols, in two pairs.
+              // On a phone it takes the header's second row, after the trace buttons (CSS order)
+              <span className="experiments">
+                <span className="tabs proto-pick" role="radiogroup" aria-label="voltage dependence">
+                  <span className="pick-label">{wide ? "Voltage" : "vs V"}</span>
+                  <button role="radio" aria-checked={experiment === "steps"} aria-label="activation protocol" className={experiment === "steps" ? "on" : ""} onClick={() => pickV(EXPERIMENTS.steps.p)}
+                    {...tour("Act", "Activation against voltage: a family of steps from one holding potential. Sodium turns on, then off; potassium turns on. I–V plots the peaks.", { kind: "pick" })}>{wide ? "Activation" : "Act"}</button>
+                  <button role="radio" aria-checked={experiment === "hinf"} aria-label="inactivation protocol" className={experiment === "hinf" ? "on" : ""} onClick={() => { pickV(EXPERIMENTS.hinf.p); setIv(true); }}
+                    {...tour("Inact", "Inactivation against voltage: each sweep a different prepulse, then all step to one test potential. The sodium current left shows how many channels the prepulse inactivated; h–V plots it.", { kind: "pick" })}>{wide ? "Inactivation" : "Inact"}</button>
+                </span>
+                <span className="tabs proto-pick" role="radiogroup" aria-label="time dependence">
+                  <span className="pick-label">{wide ? "Time" : "vs t"}</span>
+                  <button role="radio" aria-checked={experiment === "onset"} aria-label="inactivation time course" className={experiment === "onset" ? "on" : ""} onClick={() => pickV(EXPERIMENTS.onset.p)}
+                    {...tour("Inact", "Inactivation against time: one prepulse, held a little longer each sweep, then the test step. The peaks fall along an exponential with τh, drawn on the traces.", { kind: "pick" })}>{wide ? "Inactivation" : "Inact"}</button>
+                  <button role="radio" aria-checked={experiment === "recovery"} aria-label="recovery time course" className={experiment === "recovery" ? "on" : ""} onClick={() => pickV(EXPERIMENTS.recovery.p)}
+                    {...tour("Recovery", "Recovery against time: two pulses, the gap between them a little longer each sweep. The second pulse's peak comes back along an exponential with τh at rest.", { kind: "pick" })}>Recovery</button>
+                </span>
               </span>
             )}
             <span className="tabs small">
@@ -887,8 +901,10 @@ function Main({ onRetro }: { onRetro: () => void }) {
                       })}
                       <button className={clampG ? "on" : ""} aria-pressed={clampG} aria-label="conductance" onClick={() => setClampG(!clampG)}
                         {...tour("g", "Conductance instead of current: what the channels do, without the driving force.")}>g</button>
-                      <button className={`iv-btn${iv ? " on" : ""}`} aria-pressed={iv} onClick={() => { const on = !iv; setIv(on); if (inactOn) pickV(on ? INACT_PRESET : ONSET_PRESET); }}
-                        {...tour(hv ? "h–V" : "I–V", hv ? "Inactivation against voltage: prepulses to a family of potentials, then the peak sodium at one test step, over h∞. Off, the traces show its time course: prepulses of growing length." : "Peak sodium and late potassium against whatever the protocol changes from sweep to sweep.")}>{hv ? "h–V" : clampG ? "g–V" : "I–V"}</button>
+                      {!onset && (
+                        <button className={`iv-btn${iv ? " on" : ""}`} aria-pressed={iv} onClick={() => setIv(!iv)}
+                          {...tour(inact ? "h–V" : "I–V", inact ? "The curve instead of the traces: the peak sodium at the test step against the prepulse, over h∞." : "The curve instead of the traces: peak sodium and late potassium against whatever the protocol changes from sweep to sweep.")}>{inact ? "h–V" : clampG ? "g–V" : "I–V"}</button>
+                      )}
                     </>
                   )
                 : (["i", "g", "gates"] as const).map((k) => (
@@ -897,7 +913,7 @@ function Main({ onRetro }: { onRetro: () => void }) {
                   ))}
             </span>
           </div>
-          {(tab === "spike" || !iv) && protocol}
+          {(tab === "spike" || !curve) && protocol}
           <div className="sim-plots" {...tour("The traces", "Pinch or drag across them to zoom time; double-tap or double-click resets.")}>{simPlot}</div>
           {stepping && (
             <div className="stepper" role="group" aria-label="steps" {...tour("Stepping", "Back and forward through the sweeps.")}>
@@ -914,9 +930,9 @@ function Main({ onRetro }: { onRetro: () => void }) {
               {reading ? <b className="reading">{reading}</b> : (
                 <>
                   {!stepping && (tab === "clamp" ? "Ideal clamp, no electrode: what no rig records." : "The membrane alone, no electrode.")}
-                  {tab === "clamp" && iv && inact && ` ${inactNote(p.ph, clampCur.includes("iNa"), clampCur.includes("iK"))}`}
+                  {tab === "clamp" && curve && inact && ` ${inactNote(p.ph, clampCur.includes("iNa"), clampCur.includes("iK"))}`}
                   {tc && clampCur.includes("iNa") && ` ${timeCourseNote(tc.tau, sweepEpochs(vp, 0)[swept(vp)!.epoch].level, Math.abs(tc.dots.y[tc.dots.y.length - 1]) < Math.abs(tc.dots.y[0]), clampG)}`}
-                  {!stepping && (tab === "spike" || !iv) && !zoomOn && (mouse ? " Drag across the traces or scroll to zoom time; double-click to reset." : " Pinch to zoom time, drag to pan, double-tap to reset.")}
+                  {!stepping && (tab === "spike" || !curve) && !zoomOn && (mouse ? " Drag across the traces or scroll to zoom time; double-click to reset." : " Pinch to zoom time, drag to pan, double-tap to reset.")}
                   {stepping && mouse && !zoomOn && "The arrow keys, or a presentation clicker, step too."}
                 </>
               )}
@@ -924,7 +940,7 @@ function Main({ onRetro }: { onRetro: () => void }) {
             {zoomOn && (
               <button className="zoom-reset" {...tour("Reset zoom", "Back to the whole sweep.")} onClick={() => (tab === "clamp" ? setClampX(null) : setSpikeX(null))}>Reset zoom</button>
             )}
-            {(tab === "spike" || !iv) && (
+            {(tab === "spike" || !curve) && (
               <button className={`measure-btn${measure ? " on" : ""}`} aria-pressed={measure} aria-label="measuring cursor" onClick={toggleMeasure}
                 {...tour("Cursor", "Tap a trace to read time, voltage and currents; drag the line to move it. Zoom still works.")}>Cursor</button>
             )}

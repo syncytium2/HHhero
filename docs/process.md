@@ -541,3 +541,29 @@ ahead of the test, gets the same dots and line, rising, with τh at rest
 The owner, the same day: "classroom use is over. we're safe to play in the
 real site". The rule that kept main equal to the live site while the class
 used it is suspended, so this releases from main.
+
+## 2026-11-11: the experiments, in two pairs
+
+The owner, on v0.1.11: "i don't understand the controls. there's two sets
+one at the top and another in the protocols section. what does onset mean?
+may reorganize: voltage dependence vs time dependence. voltage dependence
+has act and inact. time dependence has inact and recovery". Three things
+chose one experiment: the header's Act | Inact, the curve button (which in
+Inact also changed the protocol), and the Protocol list; and "Onset" named
+nothing a student knows.
+
+Now the header alone picks, in the owner's two pairs: voltage dependence,
+Act and Inact (the step family and the prepulse family; the I–V / h–V
+button shows the curve instead of the traces, and Inact opens on h–V), and
+time dependence, Inact and Recovery (the time course drawn on the traces,
+so no curve button). The lit one is the protocol as it stands: an edit under
+Protocol unlights all four. Protocol lists only what the header does not
+(Tails, and the current-clamp protocols). The preset "Onset" is "Inactivation
+vs time"; its id stays `onset`.
+
+The phone header stays two rows, which the fit checks require: the trace
+buttons (Na, K, g, curve) moved up beside the tabs, 319 of 326 px, and the
+experiments take the second row (CSS order, not DOM order, so the tour and
+the keyboard still go tabs, Step, experiments, traces). Wide, one row, with
+the pair labels shortened to Voltage and Time so Focus still fits 900 px.
+

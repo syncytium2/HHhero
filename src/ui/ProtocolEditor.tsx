@@ -29,6 +29,8 @@ interface Props {
   p: Protocol;
   setP: (p: Protocol) => void;
   presets: Preset[];
+  /** ids of presets the clamp header picks: not listed here, where only the rest are */
+  inHeader?: string[];
   /** the stock protocol last chosen: its values are the sliders' stock marks */
   base: Protocol;
   setBase: (p: Protocol) => void;
@@ -36,7 +38,7 @@ interface Props {
   setSel: (j: number) => void;
 }
 
-export function ProtocolEditor({ mode, onMode, p, setP, presets, base, setBase, sel, setSel }: Props) {
+export function ProtocolEditor({ mode, onMode, p, setP, presets, inHeader = [], base, setBase, sel, setSel }: Props) {
   const j = Math.min(sel, p.epochs.length - 1);
   const e = p.epochs[j], e0 = base.epochs[j] ?? e;
   const L = LETTERS[j];
@@ -87,8 +89,9 @@ export function ProtocolEditor({ mode, onMode, p, setP, presets, base, setBase, 
         <button role="radio" aria-checked={!v} className={!v ? "on" : ""} onClick={() => onMode("i")}>I clamp</button>
       </div>
       <div className="ladder-pick wrap" role="radiogroup" aria-label="stock protocols"
-        {...tour("Protocols", "Classic protocols to start from. Each sets the epochs below, and every one can be edited.")}>
-        {presets.map((pr) => {
+        {...tour("Protocols", inHeader.length ? "More protocols to start from, besides the experiments the header picks. Each sets the epochs above, and every one can be edited." : "Classic protocols to start from. Each sets the epochs above, and every one can be edited.")}>
+        {inHeader.length > 0 && <span className="pick-label">Also</span>}
+        {presets.filter((pr) => !inHeader.includes(pr.id)).map((pr) => {
           const on = matched?.id === pr.id;
           return (
             <button key={pr.id} role="radio" aria-checked={on} className={on ? "on" : ""}

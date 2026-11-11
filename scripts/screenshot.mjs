@@ -262,7 +262,10 @@ if (!(await legend(phone)).includes("11 sweeps, B from −55 to 45 mV")) problem
 await phone.getByRole("button", { name: "increase sweeps" }).tap();
 await phone.waitForTimeout(100);
 if (!(await legend(phone)).includes("12 sweeps, B from −55 to 55 mV")) problems.push(`phone: one more sweep did not lengthen the family ("${await legend(phone)}")`);
-await phone.getByRole("radio", { name: "Inactivation", exact: true }).tap();
+// the header picks the experiments; Protocol lists only the rest
+if (await phone.locator(".panel").getByRole("radio", { name: "Inactivation vs voltage" }).count()) problems.push("phone: Protocol still lists an experiment the header picks");
+if (!(await phone.locator(".panel").getByRole("radio", { name: "Tails" }).count())) problems.push("phone: Protocol does not list Tails");
+await phone.getByRole("radio", { name: "inactivation protocol" }).tap();
 await phone.waitForTimeout(150);
 if (!(await legend(phone)).includes("11 sweeps, B from −125 to −25 mV")) problems.push(`phone: Inactivation reads "${await legend(phone)}"`);
 await phone.getByRole("radio", { name: "epoch C" }).tap();
@@ -274,7 +277,7 @@ if (!(await phone.getByRole("radio", { name: "epoch D" }).count())) problems.pus
 await phone.screenshot({ path: `${out}/phone-builder.png` });
 await noSideways(phone, "phone builder");
 await phone.getByRole("button", { name: "remove epoch" }).tap();
-await phone.getByRole("radio", { name: "Steps", exact: true }).tap();
+await phone.getByRole("radio", { name: "activation protocol", exact: true }).tap();
 await phone.getByRole("radio", { name: "I clamp" }).tap();
 // a slider changes the cell, not the pulses: the pulse stays put, and Re-center rebuilds them around the new threshold
 await phone.waitForTimeout(150);
@@ -321,22 +324,28 @@ await phone.getByRole("button", { name: "focus on the traces" }).tap();
 await phone.waitForTimeout(100);
 if (!(await phone.locator(".curves").count())) problems.push("phone: turning Focus off did not bring the curves back");
 
-// inactivation: prepulses then one test step; h–V plots the peak at the test step against the prepulse, over h∞
+// the experiments: voltage dependence (Act, Inact: the curve instead of the traces, by the I–V / h–V button)
+// and time dependence (Inact, Recovery: the time course drawn on the traces, no curve button)
 await phone.getByRole("button", { name: "Voltage clamp" }).tap();
 await phone.locator(".chips").getByRole("tab", { name: "Protocol", exact: true }).tap();
-await phone.getByRole("radio", { name: "inactivation protocol" }).tap();
+await phone.getByRole("radio", { name: "inactivation time course" }).tap();
 await phone.waitForTimeout(150);
 await phone.screenshot({ path: `${out}/phone-inact.png` });
-// Inact opens on the time course: prepulses of growing length, the peaks as dots on the exponential with τh
-if (!(await phone.getByText(/prepulse [-−]57 for 0 to 50 ms, then test [-−]21/).count())) problems.push("phone: Inact's traces are not the time course (prepulses of growing length)");
+if (!(await phone.getByText(/prepulse [-−]57 for 0 to 50 ms, then test [-−]21/).count())) problems.push("phone: Inact vs t is not the time course (prepulses of growing length)");
 if (!(await phone.getByText(/τh at [-−]57 mV/).count())) problems.push("phone: the time course has no note naming τh");
+if (await phone.getByRole("button", { name: /^(I–V|h–V|g–V)$/ }).count()) problems.push("phone: the time course still offers a curve button");
 await noSideways(phone, "phone inactivation time course");
-await phone.getByRole("button", { name: "h–V" }).tap();
+await phone.getByRole("radio", { name: "recovery time course" }).tap();
 await phone.waitForTimeout(150);
-if (!(await phone.getByText(/prepulses [-−]125 to [-−]25 by 10, then test 0/).count()) && !(await phone.locator('svg[aria-label="steady-state inactivation"]').count())) problems.push("phone: h–V did not switch to the prepulse-level protocol");
+await phone.screenshot({ path: `${out}/phone-recovery.png` });
+if (!(await phone.getByText(/rise as h recovers/).count())) problems.push("phone: Recovery has no note saying the peaks rise");
+if (!(await phone.getByText(/τh at [-−]65 mV/).count())) problems.push("phone: Recovery's note does not name τh at rest");
+await noSideways(phone, "phone recovery");
+// Inact vs V opens on its curve, h–V, and the button turns it off
+await phone.getByRole("radio", { name: "inactivation protocol" }).tap();
 await phone.waitForTimeout(150);
 await phone.screenshot({ path: `${out}/phone-inact-hv.png` });
-if (!(await phone.locator('svg[aria-label="steady-state inactivation"]').count())) problems.push("phone: h–V did not draw the inactivation curve");
+if (!(await phone.locator('svg[aria-label="steady-state inactivation"]').count())) problems.push("phone: Inact vs V did not open on the inactivation curve");
 if (!(await phone.getByText(/Line: h∞ at the prepulse/).count())) problems.push("phone: h–V has no note under it");
 const hv = await phone.evaluate(() => {
   const s = document.querySelector('svg[aria-label="steady-state inactivation"]')?.getBoundingClientRect(), k = document.querySelector(".controls .slider")?.getBoundingClientRect();
@@ -352,9 +361,11 @@ if (!(await phone.locator('svg[aria-label="steady-state inactivation"] text', { 
 if (!(await phone.getByText(/no inactivation gate/).count())) problems.push("phone: h–V with K has no potassium note");
 await phone.getByRole("button", { name: "potassium" }).tap();
 await phone.getByRole("button", { name: "h–V" }).tap();
+await phone.waitForTimeout(150);
+if (!(await phone.getByText(/prepulses [-−]125 to [-−]25 by 10, then test 0/).count())) problems.push("phone: h–V off did not show the prepulse traces");
 await phone.getByRole("radio", { name: "activation protocol", exact: true }).tap();
 await phone.waitForTimeout(80);
-if (!(await phone.getByRole("button", { name: "I–V" }).count())) problems.push("phone: back on Steps, the I–V button did not come back");
+if (!(await phone.getByRole("button", { name: "I–V" }).count())) problems.push("phone: back on Act, the I–V button did not come back");
 
 await phone.getByRole("button", { name: "Why" }).tap();
 await phone.waitForTimeout(100);

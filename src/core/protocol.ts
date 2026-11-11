@@ -360,12 +360,12 @@ export const V_PRESETS: Preset[] = [
     p: { mode: "v", epochs: [ep(-65, 1), ep(-55, 10, 10)], sweeps: 11, measure: 1 },
   },
   {
-    id: "hinf", name: "Inactivation",
+    id: "hinf", name: "Inactivation vs voltage",
     text: "50 ms prepulses from −125 to −25 mV, then every sweep steps to 0 mV: the sodium current left at the test step shows how many channels each prepulse inactivated. h–V plots it over h∞.",
     p: { mode: "v", epochs: [ep(-65, 1), ep(-125, 50, 10), ep(0, 10)], sweeps: 11, measure: 2 },
   },
   {
-    id: "onset", name: "Onset",
+    id: "onset", name: "Inactivation vs time",
     text: "A prepulse to −57 mV held from 0 to 50 ms, then every sweep steps to −21 mV: the test's sodium current falls as h does at −57 mV, with τh (Hodgkin and Huxley 1952, J Physiol 116:497, Fig. 1).",
     p: { mode: "v", epochs: [ep(-65, 1), ep(-57, 0, 0, 5), ep(-21, 5)], sweeps: 11, measure: 2 },
   },

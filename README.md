@@ -19,11 +19,18 @@ both x∞ and τ. In the x∞, τ view you can move one and leave the other alon
 That difference is the lesson. Each view keeps its own edits; a gate edited
 in the other view says so, with a reset.
 
-Protocol builds the experiment, in voltage clamp or current clamp: up to five
-epochs, each a level held for a time, either of which can change from sweep
-to sweep. Stock protocols start you off: a step family, inactivation,
-recovery from inactivation and tails in voltage clamp; a pulse, two pulses
-(the refractory period), anode break and a long step in current clamp.
+In voltage clamp, the header picks the experiment, in two pairs. Voltage
+dependence: Act, a family of steps (I–V plots the peaks), and Inact,
+prepulses to a family of potentials before one test step (h–V plots the
+sodium left, over h∞). Time dependence: Inact, one prepulse held a little
+longer each sweep, and Recovery, two pulses with a growing gap; the peaks
+fall or rise along an exponential with τh, drawn on the traces.
+
+Protocol, among the sliders, holds the epochs of whatever is running: up to
+five, each a level held for a time, either of which can change from sweep
+to sweep. Edit them and the experiment becomes your own. It also starts
+tails in voltage clamp, and in current clamp a pulse, two pulses (the
+refractory period), anode break and a long step.
 
 For teaching from the front, the Step switch over the traces walks the sweeps
 one at a time, or, for a single current pulse, a ladder of pulses up to and
@@ -34,7 +41,8 @@ New to it? Why, at the top, starts with what an action potential is and says
 where this site fits; it also holds the model's source and the earlier
 versions. Tour, beside it, walks every control and shows it working, then
 puts everything back. In voltage clamp, Na and K switch each channel on and
-off, g shows conductance instead of current, and I–V (g–V) plots the peaks.
+off, g shows conductance instead of current, and I–V (g–V, h–V) shows the
+curve instead of the traces.
 
 While it is under review, nothing links to the 1952 screen (`SHOW_1952` in
 `src/App.tsx`); `#1952` still opens it. When shown, on a laptop, **1952**
