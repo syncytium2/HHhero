@@ -147,6 +147,8 @@ a { color: inherit; }
 .app.wide > .archived { grid-column: 1 / -1; }
 .app.wide .plots { padding: 10px; overflow-y: auto; }
 .app.wide .controls { margin-top: 0; border-top: 0; border-left: 1px solid var(--line); }
+/* wide: every chip in view, on a second row if need be; the phone keeps the sideways scroll, where height is short */
+.app.wide .chips { flex-wrap: wrap; overflow-x: visible; }
 .app.wide .card-head { font-size: 14px; }
 .app.wide .readout { font-size: 14px; }
 
