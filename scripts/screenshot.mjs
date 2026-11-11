@@ -327,8 +327,13 @@ await phone.locator(".chips").getByRole("tab", { name: "Protocol", exact: true }
 await phone.getByRole("radio", { name: "inactivation protocol" }).tap();
 await phone.waitForTimeout(150);
 await phone.screenshot({ path: `${out}/phone-inact.png` });
-if (!(await phone.getByText(/prepulses [-−]125 to [-−]25 by 10, then test 0/).count())) problems.push("phone: the inactivation protocol strip does not say its prepulses and test step");
+// Inact opens on the time course: prepulses of growing length, the peaks as dots on the exponential with τh
+if (!(await phone.getByText(/prepulse [-−]57 for 0 to 50 ms, then test [-−]21/).count())) problems.push("phone: Inact's traces are not the time course (prepulses of growing length)");
+if (!(await phone.getByText(/τh at [-−]57 mV/).count())) problems.push("phone: the time course has no note naming τh");
+await noSideways(phone, "phone inactivation time course");
 await phone.getByRole("button", { name: "h–V" }).tap();
+await phone.waitForTimeout(150);
+if (!(await phone.getByText(/prepulses [-−]125 to [-−]25 by 10, then test 0/).count()) && !(await phone.locator('svg[aria-label="steady-state inactivation"]').count())) problems.push("phone: h–V did not switch to the prepulse-level protocol");
 await phone.waitForTimeout(150);
 await phone.screenshot({ path: `${out}/phone-inact-hv.png` });
 if (!(await phone.locator('svg[aria-label="steady-state inactivation"]').count())) problems.push("phone: h–V did not draw the inactivation curve");

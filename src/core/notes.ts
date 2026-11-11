@@ -45,3 +45,12 @@ export function inactNote(ph: number, na: boolean, k: boolean): string {
   if (k) out.push("IK at the end of the test step, over the largest, barely moves: this potassium channel has no inactivation gate.");
   return out.join(" ");
 }
+
+/**
+ * What the time course of inactivation shows on the traces, under them: the
+ * dots, the line, and τh at the lengthened epoch's potential.
+ */
+export function timeCourseNote(tau: number, level: number, falls: boolean, g: boolean): string {
+  const r = (x: number) => (Math.abs(x) >= 10 ? x.toFixed(0) : x.toPrecision(2)).replace("-", "−");
+  return `Dots: each sweep's peak ${g ? "gNa" : "INa"} at the test step. Dashed: an exponential from the first to the last, with τh at ${r(level)} mV, ${r(tau)} ms. The peaks ${falls ? "fall as h inactivates" : "rise as h recovers"} during the lengthening epoch.`;
+}

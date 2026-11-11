@@ -179,3 +179,22 @@ describe("the inactivation note is true: the dots are h∞ when h settles in the
     expect(md.openK(0.5)).toBe(Math.pow(0.5, S.pn));
   });
 });
+
+describe("the time-course note is true", () => {
+  it("names the τh the line uses, the potential, and which way the peaks go", async () => {
+    const { timeCourseNote } = await import("./notes.ts");
+    const { timeCourse, vclamp, V_PRESETS } = await import("./protocol.ts");
+    const md = buildModel(stockParams());
+    for (const [id, level, falls] of [["onset", -57, true], ["recovery", -65, false]] as const) {
+      const p = V_PRESETS.find((x) => x.id === id)!.p;
+      const fam = vclamp(md, p), tc = timeCourse(md, p, fam);
+      const y = tc.dots.y;
+      // the peaks (INa is negative: a larger peak is more negative) fall or rise as the note says
+      expect(Math.abs(y[y.length - 1]) < Math.abs(y[0])).toBe(falls);
+      const note = timeCourseNote(tc.tau, level, falls, false);
+      expect(note).toContain(`τh at −${-level} mV, ${tc.tau.toPrecision(2)} ms`);
+      expect(note).toContain(falls ? "fall as h inactivates" : "rise as h recovers");
+    }
+    expect(timeCourseNote(6.82, -57, true, true)).toContain("peak gNa");
+  });
+});

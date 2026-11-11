@@ -20,11 +20,11 @@ import {
 import { buildModel, stockParams, type Model, type Params } from "./core/model.ts";
 import { availability, settle, spikeTimes, thresholdLadder, type ClampSweep } from "./core/sim.ts";
 import {
-  commandLine, DEFAULT_I, DEFAULT_V, epochAtTime, inactShaped, firesP, I_PRESETS, iclamp, iclampSweep, LETTERS, longestSweep, pulseAmp, swept,
+  commandLine, DEFAULT_I, DEFAULT_V, epochAtTime, inactShaped, onsetShaped, timeCourse, firesP, I_PRESETS, iclamp, iclampSweep, LETTERS, longestSweep, pulseAmp, swept,
   sweepEpochs, thresholdP, V_PRESETS, vclamp, withPulse, type Protocol,
 } from "./core/protocol.ts";
 import { ProtocolEditor, protocolWords } from "./ui/ProtocolEditor.tsx";
-import { hInfLabel, inactNote, noteFor, type View } from "./core/notes.ts";
+import { hInfLabel, inactNote, noteFor, timeCourseNote, type View } from "./core/notes.ts";
 import { ARCHIVED, BORN, DEV_SITE, EARLIER, VERSION } from "./version.ts";
 
 type Sel = GateId | "na" | "k" | "mem" | "proto";
@@ -159,8 +159,11 @@ function Main({ onRetro }: { onRetro: () => void }) {
   const [iBase, setIBase] = useState<Protocol>(DEFAULT_I);
   const [selEp, setSelEp] = useState(1);
   const INACT_PRESET = V_PRESETS.find((x) => x.id === "hinf")!.p;
-  // the header's Act | Inact: the stock protocol the clamp last started from
-  const actOn = same(vBase, V_PRESETS[0].p), inactOn = same(vBase, INACT_PRESET);
+  const ONSET_PRESET = V_PRESETS.find((x) => x.id === "onset")!.p;
+  // The header's Act | Inact, with the traces / curve button, is a grid: Act shows the step family's
+  // currents (traces) or its I–V (curve); Inact shows the time course of inactivation (Onset) or its
+  // voltage dependence, h–V (Inactivation). Which is on follows the stock protocol the clamp last started from.
+  const actOn = same(vBase, V_PRESETS[0].p), inactOn = same(vBase, INACT_PRESET) || same(vBase, ONSET_PRESET);
   // a new protocol starts unzoomed, at its first sweep, with no cursor
   const pickV = (q: Protocol) => { setVp(q); setVBase(q); setSelEp(1); setClampK(0); setClampX(null); setClampT(null); setClampPick(null); };
   const [cursor, setCursor] = useState(-40);
@@ -411,9 +414,19 @@ function Main({ onRetro }: { onRetro: () => void }) {
   // the protocol strip: what the experimenter commands, on the traces' time axis
   // a prepulse family ahead of the measured step: the inactivation shape, whose I–V is h–V
   const inact = inactShaped(vp);
+  // the time course of inactivation: an epoch lengthened sweep by sweep ahead of the measured one
+  const onset = onsetShaped(vp);
+  const hv = inact || inactOn;
+  const tc = onset && !iv ? timeCourse(md, vp, fam, clampG) : null;
   const inactWords = (() => {
     const s = swept(vp), e = vp.epochs[s?.epoch ?? 0], last = sweepEpochs(vp, vp.sweeps - 1)[s?.epoch ?? 0];
     return `prepulses ${fmt(e.level)} to ${fmt(last.level)} by ${fmt(e.dLevel)}, then test ${fmt(vp.epochs[vp.measure].level)}`;
+  })();
+  const onsetWords = (() => {
+    const s = swept(vp);
+    if (!s || s.what !== "dur") return "";
+    const a = sweepEpochs(vp, 0)[s.epoch], b = sweepEpochs(vp, vp.sweeps - 1)[s.epoch];
+    return `${s.epoch === 1 ? "prepulse" : `${LETTERS[s.epoch]}`} ${fmt(a.level)} for ${fmt(a.dur)} to ${fmt(b.dur)} ms, then test ${fmt(vp.epochs[vp.measure].level)}`;
   })();
   const vLines = fam.map((s) => commandLine(vp, s.k));
   // current clamp: the pulses of the threshold ladder, or the protocol's own sweeps
@@ -430,7 +443,7 @@ function Main({ onRetro }: { onRetro: () => void }) {
         onCursor={measure ? onClampStrip : undefined}
         noXTicks
         yInclude={vLines.flatMap((l) => l.y)}
-        yLabel={`command V (mV): ${inact ? inactWords : protocolWords(vp)}`}
+        yLabel={`command V (mV): ${inact ? inactWords : onset ? onsetWords : protocolWords(vp)}`}
         series={upTo(vLines).map((l, j) => ({
           x: l.x,
           y: l.y,
@@ -548,6 +561,13 @@ function Main({ onRetro }: { onRetro: () => void }) {
               opacity: measure && clampT !== null && j === mi ? 1 : fade(j),
               label: labelled(j) ? cqLabel(c) : undefined, labelAt: "peak",
             }) as Series),
+            // the time course of inactivation: each sweep's peak as a dot, on the exponential with τh at the lengthened epoch
+            ...(tc && c === "iNa"
+              ? [
+                  { x: tc.line.x, y: tc.line.y, color: C.h, width: 1.4, dash: "5 4", label: "τh" } as Series,
+                  { x: upTo(tc.dots.x), y: upTo(tc.dots.y), color: C.na, width: 0, dots: true } as Series,
+                ]
+              : []),
           ])}
         />
       );
@@ -631,9 +651,12 @@ function Main({ onRetro }: { onRetro: () => void }) {
   let stepText = "";
   if (stepping && tab === "clamp") {
     const w = sweepWords(vp, k);
+    const se = swept(vp), ek = se ? sweepEpochs(vp, k)[se.epoch] : null;
     stepText = inact
-      ? `Prepulse ${k + 1} of ${nSteps}: ${fmt(fam[k].x)} mV for ${fmt(sweepEpochs(vp, k)[swept(vp)!.epoch].dur)} ms, then test ${fmt(fam[k].v)} mV`
-      : `Sweep ${k + 1} of ${nSteps}${w ? `: ${w}` : ""}`;
+      ? `Prepulse ${k + 1} of ${nSteps}: ${fmt(fam[k].x)} mV for ${fmt(ek!.dur)} ms, then test ${fmt(fam[k].v)} mV`
+      : onset && se?.epoch === 1
+        ? `Prepulse ${k + 1} of ${nSteps}: ${fmt(ek!.level)} mV for ${fmt(ek!.dur)} ms, then test ${fmt(fam[k].v)} mV`
+        : `Sweep ${k + 1} of ${nSteps}${w ? `: ${w}` : ""}`;
   } else if (stepping && family) {
     const w = sweepWords(ip, k), n = spikeTimes(runs[k].t, runs[k].v).length;
     stepText = `Sweep ${k + 1} of ${nSteps}${w ? `: ${w}` : ""}, ${n === 0 ? "no spike" : n === 1 ? "1 spike" : `${n} spikes`}`;
@@ -847,7 +870,7 @@ function Main({ onRetro }: { onRetro: () => void }) {
               <span className="tabs proto-pick" role="radiogroup" aria-label="voltage-clamp protocol">
                 <button role="radio" aria-checked={actOn} aria-label="activation protocol" className={actOn ? "on" : ""} onClick={() => pickV(V_PRESETS[0].p)}
                   {...tour("Act", "Activation: a family of steps from one holding potential. Sodium turns on, then off; potassium turns on.", { kind: "pick" })}>{wide ? "Activation" : "Act"}</button>
-                <button role="radio" aria-checked={inactOn} aria-label="inactivation protocol" className={inactOn ? "on" : ""} onClick={() => pickV(INACT_PRESET)}
+                <button role="radio" aria-checked={inactOn} aria-label="inactivation protocol" className={inactOn ? "on" : ""} onClick={() => pickV(iv ? INACT_PRESET : ONSET_PRESET)}
                   {...tour("Inact", "Inactivation: each sweep a different prepulse, then all step to one test potential. The sodium current left shows how many channels the prepulse inactivated; h–V plots it. Its epochs are under Protocol.", { kind: "pick" })}>{wide ? "Inactivation" : "Inact"}</button>
               </span>
             )}
@@ -864,8 +887,8 @@ function Main({ onRetro }: { onRetro: () => void }) {
                       })}
                       <button className={clampG ? "on" : ""} aria-pressed={clampG} aria-label="conductance" onClick={() => setClampG(!clampG)}
                         {...tour("g", "Conductance instead of current: what the channels do, without the driving force.")}>g</button>
-                      <button className={`iv-btn${iv ? " on" : ""}`} aria-pressed={iv} onClick={() => setIv(!iv)}
-                        {...tour(inact ? "h–V" : "I–V", inact ? "Peak sodium at the test step against the prepulse, over h∞: the inactivation curve. Potassium, if on, stays flat." : "Peak sodium and late potassium against whatever the protocol changes from sweep to sweep.")}>{inact ? "h–V" : clampG ? "g–V" : "I–V"}</button>
+                      <button className={`iv-btn${iv ? " on" : ""}`} aria-pressed={iv} onClick={() => { const on = !iv; setIv(on); if (inactOn) pickV(on ? INACT_PRESET : ONSET_PRESET); }}
+                        {...tour(hv ? "h–V" : "I–V", hv ? "Inactivation against voltage: prepulses to a family of potentials, then the peak sodium at one test step, over h∞. Off, the traces show its time course: prepulses of growing length." : "Peak sodium and late potassium against whatever the protocol changes from sweep to sweep.")}>{hv ? "h–V" : clampG ? "g–V" : "I–V"}</button>
                     </>
                   )
                 : (["i", "g", "gates"] as const).map((k) => (
@@ -892,6 +915,7 @@ function Main({ onRetro }: { onRetro: () => void }) {
                 <>
                   {!stepping && (tab === "clamp" ? "Ideal clamp, no electrode: what no rig records." : "The membrane alone, no electrode.")}
                   {tab === "clamp" && iv && inact && ` ${inactNote(p.ph, clampCur.includes("iNa"), clampCur.includes("iK"))}`}
+                  {tc && clampCur.includes("iNa") && ` ${timeCourseNote(tc.tau, sweepEpochs(vp, 0)[swept(vp)!.epoch].level, Math.abs(tc.dots.y[tc.dots.y.length - 1]) < Math.abs(tc.dots.y[0]), clampG)}`}
                   {!stepping && (tab === "spike" || !iv) && !zoomOn && (mouse ? " Drag across the traces or scroll to zoom time; double-click to reset." : " Pinch to zoom time, drag to pan, double-tap to reset.")}
                   {stepping && mouse && !zoomOn && "The arrow keys, or a presentation clicker, step too."}
                 </>

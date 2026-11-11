@@ -154,3 +154,40 @@ describe("threshold on a protocol", () => {
     expect(firesP(md, withPulse(p, thr * 0.99), from, DT)).toBe(false);
   });
 });
+
+describe("the time course of inactivation (Inact, traces)", () => {
+  it("Onset: the test's peaks fall from sweep to sweep, and every one sits on the exponential with τh at −57 mV", async () => {
+    const { onsetShaped, timeCourse } = await import("./protocol.ts");
+    const p = preset(V_PRESETS, "onset");
+    expect(onsetShaped(p)).toBe(true);
+    expect(onsetShaped(preset(V_PRESETS, "hinf"))).toBe(false);
+    for (const celsius of [6.3, 20]) {
+      for (const g of [false, true]) {
+        const m = buildModel({ ...stockParams(), celsius });
+        const fam = vclamp(m, p);
+        const tc = timeCourse(m, p, fam, g);
+        expect(tc.tau).toBeCloseTo(m.g.h.tau(-57), 12);
+        const y = tc.dots.y, scale = Math.abs(y[0]);
+        for (let k = 1; k < y.length; k++) expect(Math.abs(y[k])).toBeLessThanOrEqual(Math.abs(y[k - 1]) + 1e-12);
+        fam.forEach((s, k) => expect(Math.abs(y[k] - tc.lineAt(s.x)) / scale).toBeLessThan(0.02));
+        // each dot is at its own sweep's peak, in that sweep's test step
+        fam.forEach((s, k) => expect(tc.dots.x[k]).toBeGreaterThan(1 + s.x));
+      }
+    }
+  });
+  it("Recovery: the second pulse's peaks rise on the exponential with τh at rest", async () => {
+    const { onsetShaped, timeCourse } = await import("./protocol.ts");
+    const p = preset(V_PRESETS, "recovery");
+    expect(onsetShaped(p)).toBe(true);
+    for (const celsius of [6.3, 20]) {
+      const m = buildModel({ ...stockParams(), celsius });
+      const fam = vclamp(m, p), tc = timeCourse(m, p, fam);
+      expect(tc.tau).toBeCloseTo(m.g.h.tau(-65), 12);
+      const scale = Math.abs(tc.dots.y[tc.dots.y.length - 1]);
+      fam.forEach((s, k) => expect(Math.abs(tc.dots.y[k] - tc.lineAt(s.x)) / scale).toBeLessThan(0.02));
+    }
+  });
+  it("at 6.3 °C the peaks fall with τh at −57 mV, 6.8 ms", () => {
+    expect(md.g.h.tau(-57)).toBeCloseTo(6.82, 2);
+  });
+});

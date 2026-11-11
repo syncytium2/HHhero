@@ -513,3 +513,31 @@ Act and Inact starts the chosen protocol fresh rather than keeping each
 one's edits, because a protocol is now one set of epochs. Recovery and
 onset of inactivation, which 7 Nov expected to join the switch, are
 presets in Protocol.
+
+## 2026-11-11: the time course of inactivation, and the class is over
+
+The owner: "we also need time course of inact. not sure how to organize
+this as this is already very busy. maybe the buttons for time course can
+flip from act to inact, and same for act/inact curve?" Built as a grid on
+the two controls the clamp header already has: Act | Inact picks the
+process, and the curve button picks time course (off: the traces) or
+voltage dependence (on). Act: the step family, or its I–V. Inact: Onset,
+a prepulse to −57 mV held 0 to 50 ms then a test to −21 mV (Hodgkin &
+Huxley 1952, J Physiol 116:497, Fig. 1: a small prepulse, so no sodium
+current flows during it), or h–V on the 7 Nov prepulse-level protocol. In
+Inact the curve button changes the protocol as well as the plot. No new
+button; the phone row is unchanged.
+
+On the Onset traces each sweep's test peak is a dot, and a dashed line is
+an exponential from the first peak to the last with τh at the prepulse's
+potential (6.8 ms at −57 mV, 6.3 °C). The peaks do not sit on h itself:
+the prepulse also raises m (m∞ is 0.13 at −57 mV), so every peak after the
+first is about 2% larger than h alone gives; their time constant is τh to
+three figures. Tested at 6.3 and 20 °C, as currents and conductances:
+every dot within 2% of the line. Recovery, which lengthens a gap at rest
+ahead of the test, gets the same dots and line, rising, with τh at rest
+(within 0.7%).
+
+The owner, the same day: "classroom use is over. we're safe to play in the
+real site". The rule that kept main equal to the live site while the class
+used it is suspended, so this releases from main.

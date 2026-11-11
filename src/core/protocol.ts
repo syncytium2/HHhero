@@ -122,6 +122,68 @@ export function inactShaped(p: Protocol): boolean {
 }
 
 /**
+ * A protocol that lengthens a prepulse ahead of the epoch it measures: the
+ * time course of inactivation (onset, or recovery). Its peaks fall or rise as
+ * h does at the prepulse's potential.
+ */
+export function onsetShaped(p: Protocol): boolean {
+  const s = swept(p);
+  return p.mode === "v" && !!s && s.what === "dur" && s.epoch > 0 && s.epoch < p.measure;
+}
+
+/**
+ * h at the end of the swept epoch, for any length of it: the gates as the
+ * epoch begins (sweep 0's history, which a length change does not alter),
+ * relaxing exactly toward h∞ at its level with its τh. The model's own
+ * time course, for the dashed line over the peaks.
+ */
+export function hAfter(md: Model, p: Protocol, durs: number[]): number[] {
+  const s = swept(p);
+  if (!s) return durs.map(() => NaN);
+  const eps = sweepEpochs(p, 0);
+  const g = md.g.h;
+  let h = g.inf(eps[0].level);
+  for (let j = 1; j < s.epoch; j++) {
+    const v = eps[j].level;
+    h = g.inf(v) + (h - g.inf(v)) * Math.exp(-eps[j].dur / g.tau(v));
+  }
+  const v = eps[s.epoch].level, inf = g.inf(v), tau = g.tau(v);
+  return durs.map((d) => inf + (h - inf) * Math.exp(-d / tau));
+}
+
+/**
+ * The time course of inactivation, drawn on the traces: each sweep's peak at
+ * the measured epoch (INa in mA/cm², or gNa with `g`) as a dot where it
+ * happens, and an exponential from the first peak to the last with τh at the
+ * swept epoch's potential, placed where each length of it puts the peak.
+ */
+export function timeCourse(md: Model, p: Protocol, fam: ProtoClampSweep[], g = false) {
+  const s = swept(p)!;
+  const ms = p.measure;
+  const startOf = (k: number) => sweepEpochs(p, k).slice(0, ms).reduce((a, e) => a + e.dur, 0);
+  const val = (sw: ProtoClampSweep) => (g ? sw.gNaPeak : sw.iNaPeak / 1000);
+  const at = (sw: ProtoClampSweep) => {
+    const want = g ? sw.gNaPeak : sw.iNaPeak, arr = g ? sw.gNa : sw.iNa, t0 = startOf(sw.k);
+    for (let i = 0; i < arr.length; i++) if (sw.t[i] > t0 && arr[i] === want) return sw.t[i];
+    return t0;
+  };
+  const dots = { x: fam.map(at), y: fam.map(val) };
+  const tau = md.g.h.tau(sweepEpochs(p, 0)[s.epoch].level);
+  const d0 = fam[0].x, d1 = fam[fam.length - 1].x, y0 = dots.y[0], y1 = dots.y[dots.y.length - 1];
+  const lag = dots.x[0] - startOf(0);
+  const ds = Array.from({ length: 121 }, (_, i) => d0 + ((d1 - d0) * i) / 120);
+  // from the first peak toward the last: y1 is where it settles, if the last sweep is long enough to have settled
+  const span = 1 - Math.exp(-(d1 - d0) / tau);
+  const amp = span > 0 ? (y0 - y1) / span : 0;
+  const line = {
+    x: ds.map((d) => startOf(0) + (d - d0) + lag),
+    y: ds.map((d) => y0 - amp * (1 - Math.exp(-(d - d0) / tau))),
+  };
+  const lineAt = (d: number) => y0 - amp * (1 - Math.exp(-(d - d0) / tau));
+  return { tau, dots, line, lineAt };
+}
+
+/**
  * The sample times of sweep k, ms. Every dtOut from 0, as the step family
  * always was, unless some epoch other than the first and the measured one is
  * longer than FINE_MS: then each epoch is sampled from its own start, and
@@ -301,6 +363,11 @@ export const V_PRESETS: Preset[] = [
     id: "hinf", name: "Inactivation",
     text: "50 ms prepulses from −125 to −25 mV, then every sweep steps to 0 mV: the sodium current left at the test step shows how many channels each prepulse inactivated. h–V plots it over h∞.",
     p: { mode: "v", epochs: [ep(-65, 1), ep(-125, 50, 10), ep(0, 10)], sweeps: 11, measure: 2 },
+  },
+  {
+    id: "onset", name: "Onset",
+    text: "A prepulse to −57 mV held from 0 to 50 ms, then every sweep steps to −21 mV: the test's sodium current falls as h does at −57 mV, with τh (Hodgkin and Huxley 1952, J Physiol 116:497, Fig. 1).",
+    p: { mode: "v", epochs: [ep(-65, 1), ep(-57, 0, 0, 5), ep(-21, 5)], sweeps: 11, measure: 2 },
   },
   {
     id: "recovery", name: "Recovery",
