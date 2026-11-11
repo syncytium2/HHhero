@@ -341,11 +341,15 @@ await phone.screenshot({ path: `${out}/phone-recovery.png` });
 if (!(await phone.getByText(/rise as h recovers/).count())) problems.push("phone: Recovery has no note saying the peaks rise");
 if (!(await phone.getByText(/τh at [-−]65 mV/).count())) problems.push("phone: Recovery's note does not name τh at rest");
 await noSideways(phone, "phone recovery");
-// Inact vs V opens on its curve, h–V, and the button turns it off
+// Inact vs V shows its traces, the prepulse family, until the h–V button asks for the curve
 await phone.getByRole("radio", { name: "inactivation protocol" }).tap();
 await phone.waitForTimeout(150);
+if (!(await phone.getByText(/prepulses [-−]125 to [-−]25 by 10, then test 0/).count())) problems.push("phone: Inact vs V did not show the prepulse traces");
+if (await phone.locator('svg[aria-label="steady-state inactivation"]').count()) problems.push("phone: Inact vs V switched to the curve by itself");
+await phone.getByRole("button", { name: "h–V" }).tap();
+await phone.waitForTimeout(150);
 await phone.screenshot({ path: `${out}/phone-inact-hv.png` });
-if (!(await phone.locator('svg[aria-label="steady-state inactivation"]').count())) problems.push("phone: Inact vs V did not open on the inactivation curve");
+if (!(await phone.locator('svg[aria-label="steady-state inactivation"]').count())) problems.push("phone: h–V did not draw the inactivation curve");
 if (!(await phone.getByText(/Line: h∞ at the prepulse/).count())) problems.push("phone: h–V has no note under it");
 const hv = await phone.evaluate(() => {
   const s = document.querySelector('svg[aria-label="steady-state inactivation"]')?.getBoundingClientRect(), k = document.querySelector(".controls .slider")?.getBoundingClientRect();

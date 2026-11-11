@@ -876,7 +876,7 @@ function Main({ onRetro }: { onRetro: () => void }) {
                   <span className="pick-label">{wide ? "Voltage" : "vs V"}</span>
                   <button role="radio" aria-checked={experiment === "steps"} aria-label="activation protocol" className={experiment === "steps" ? "on" : ""} onClick={() => pickV(EXPERIMENTS.steps.p)}
                     {...tour("Act", "Activation against voltage: a family of steps from one holding potential. Sodium turns on, then off; potassium turns on. I–V plots the peaks.", { kind: "pick" })}>{wide ? "Activation" : "Act"}</button>
-                  <button role="radio" aria-checked={experiment === "hinf"} aria-label="inactivation protocol" className={experiment === "hinf" ? "on" : ""} onClick={() => { pickV(EXPERIMENTS.hinf.p); setIv(true); }}
+                  <button role="radio" aria-checked={experiment === "hinf"} aria-label="inactivation protocol" className={experiment === "hinf" ? "on" : ""} onClick={() => pickV(EXPERIMENTS.hinf.p)}
                     {...tour("Inact", "Inactivation against voltage: each sweep a different prepulse, then all step to one test potential. The sodium current left shows how many channels the prepulse inactivated; h–V plots it.", { kind: "pick" })}>{wide ? "Inactivation" : "Inact"}</button>
                 </span>
                 <span className="tabs proto-pick" role="radiogroup" aria-label="time dependence">

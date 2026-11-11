@@ -554,7 +554,8 @@ nothing a student knows.
 
 Now the header alone picks, in the owner's two pairs: voltage dependence,
 Act and Inact (the step family and the prepulse family; the I–V / h–V
-button shows the curve instead of the traces, and Inact opens on h–V), and
+button shows the curve instead of the traces; Inact opened on h–V until the
+owner found that a surprise, so now only the button turns the curve on), and
 time dependence, Inact and Recovery (the time course drawn on the traces,
 so no curve button). The lit one is the protocol as it stands: an edit under
 Protocol unlights all four. Protocol lists only what the header does not

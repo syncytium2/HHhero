@@ -20,9 +20,9 @@ That difference is the lesson. Each view keeps its own edits; a gate edited
 in the other view says so, with a reset.
 
 In voltage clamp, the header picks the experiment, in two pairs. Voltage
-dependence: Act, a family of steps (I–V plots the peaks), and Inact,
-prepulses to a family of potentials before one test step (h–V plots the
-sodium left, over h∞). Time dependence: Inact, one prepulse held a little
+dependence: Act, a family of steps, and Inact, prepulses to a family of
+potentials before one test step; the I–V (h–V) button shows the curve of
+the peaks instead of the traces. Time dependence: Inact, one prepulse held a little
 longer each sweep, and Recovery, two pulses with a growing gap; the peaks
 fall or rise along an exponential with τh, drawn on the traces.
 
