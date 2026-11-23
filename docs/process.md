@@ -568,3 +568,16 @@ experiments take the second row (CSS order, not DOM order, so the tour and
 the keyboard still go tabs, Step, experiments, traces). Wide, one row, with
 the pair labels shortened to Voltage and Time so Focus still fits 900 px.
 
+
+## The page opens on the spike (2026-11-23)
+
+The owner: "i'd like the app to open in spike mode, with the 9 pulses coming
+automatically about 0.5 sec apart. the default window length in spike mode
+should be 30 ms".
+
+The page now opens on Spike with Step on and plays the stock ladder, one pulse
+every 500 ms, stopping on the ninth. The first touch, click, key or wheel ends
+the playing, so it never moves a trace under someone's finger; with reduced
+motion it does not play. The stock Pulse is 30 ms instead of 40: its threshold
+and every spike time on the ladder are the same at both lengths. The other
+current-clamp protocols keep their own lengths.

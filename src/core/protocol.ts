@@ -386,7 +386,7 @@ export const I_PRESETS: Preset[] = [
   {
     id: "pulse", name: "Pulse",
     text: "A brief pulse of current, then let the cell go.",
-    p: { mode: "i", epochs: [ep(0, 5), ep(20, 0.5), ep(0, 34.5)], sweeps: 1, measure: 1 },
+    p: { mode: "i", epochs: [ep(0, 5), ep(20, 0.5), ep(0, 24.5)], sweeps: 1, measure: 1 },
   },
   {
     id: "two", name: "Two pulses",

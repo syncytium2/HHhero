@@ -32,8 +32,32 @@ const noSideways = async (page, where) => {
 
 // ---------------------------------------------------------------- phone
 const phone = await open({ viewport: { width: 360, height: 740 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
-await phone.screenshot({ path: `${out}/phone-ab.png` });
 await noSideways(phone, "phone");
+
+// the opening: Spike, a 30 ms window, the nine pulses arriving about half a second apart
+const openText = async (pg) => (await pg.locator(".step-text").count()) ? (await pg.locator(".step-text").textContent()) ?? "" : "";
+const opened = Date.now();
+if (!/^Pulse [12] of 9/.test(await openText(phone))) problems.push(`phone: the page did not open on the pulses ("${await openText(phone)}")`);
+const openTick = await phone.evaluate(() => { const t = [...document.querySelectorAll('svg[aria-label="currents during the action potential"] .tick')].filter((e) => e.getAttribute("text-anchor") === "middle"); return parseFloat(t[t.length - 1]?.textContent ?? "NaN"); });
+if (openTick !== 30) problems.push(`phone: the opening window ends at ${openTick} ms, not 30`);
+await phone.waitForFunction(() => document.querySelector(".step-text")?.textContent?.startsWith("Pulse 9 of 9"), null, { timeout: 9000 }).catch(() => problems.push("phone: the opening never reached pulse 9"));
+const playedMs = Date.now() - opened;
+if (playedMs < 3000 || playedMs > 6000) problems.push(`phone: the opening took ${playedMs} ms, not about 4000`);
+await phone.screenshot({ path: `${out}/phone-open.png` });
+{
+  // the first touch hands the page over; reduced motion does not play
+  const held = await open({ viewport: { width: 360, height: 740 }, isMobile: true, hasTouch: true });
+  await held.waitForTimeout(700);
+  await held.touchscreen.tap(180, 20);
+  const at = await openText(held);
+  await held.waitForTimeout(1300);
+  if ((await openText(held)) !== at) problems.push(`phone: a touch did not stop the opening (${at} -> ${await openText(held)})`);
+  await held.context().close();
+  const still = await open({ viewport: { width: 360, height: 740 }, isMobile: true, hasTouch: true, reducedMotion: "reduce" });
+  await still.waitForTimeout(1300);
+  if (!(await openText(still)).startsWith("Pulse 1 of 9")) problems.push(`phone: with reduced motion the opening played ("${await openText(still)}")`);
+  await still.context().close();
+}
 
 // a banner (an earlier version, or the dev site) is never squeezed: on a short screen the page's column once cut its text in half
 const bannerWhole = async (page, where) => {
@@ -68,6 +92,15 @@ const small = await phone.evaluate(() =>
     .filter((x) => x.h < x.min || x.w < Math.min(x.min, 36)),
 );
 for (const s of small) problems.push(`phone: touch target too small: "${s.t}" ${s.w}×${s.h} (min ${s.min})`);
+
+// the rest of this walk starts from the clamp with Step off
+const toClamp = async (pg) => {
+  await pg.getByRole("button", { name: "Voltage clamp" }).click();
+  await pg.getByRole("button", { name: "step through" }).click();
+  await pg.waitForTimeout(120);
+};
+await toClamp(phone);
+await phone.screenshot({ path: `${out}/phone-ab.png` });
 
 // the tour knows no features: every control on screen must carry a caption (tour() in App.tsx), or the tour misses it
 const untoured = async (pg, where) => {
@@ -379,6 +412,16 @@ await phone.getByRole("button", { name: "Close" }).tap();
 
 // ---------------------------------------------------------------- wide
 const wide = await open({ viewport: { width: 1440, height: 900 } });
+await wide.screenshot({ path: `${out}/wide-open.png` });
+for (const [w, h] of [[1440, 900], [1280, 800], [1366, 768]]) {
+  await wide.setViewportSize({ width: w, height: h });
+  await wide.waitForTimeout(150);
+  const b = await wide.evaluate(() => document.querySelector(".sim")?.getBoundingClientRect().bottom ?? Infinity);
+  if (b > h) problems.push(`wide ${w}×${h}: the opening's traces and stepper run off the screen (${Math.round(b)} > ${h})`);
+}
+await wide.setViewportSize({ width: 1440, height: 900 });
+await wide.waitForTimeout(150);
+await toClamp(wide);
 await wide.screenshot({ path: `${out}/wide-ab.png` });
 // the mouse: drag across the traces zooms to the dragged window; double-click resets; the wheel zooms
 const wSel = 'svg[aria-label="sodium current family"]';

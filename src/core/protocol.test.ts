@@ -26,9 +26,9 @@ describe("the stock protocols are the old ones", () => {
     });
   });
   it("current clamp: the default is the old pulse, to the bit", () => {
-    const old = freeRun(md, { ...DEFAULT_STIM, sweep: 40 }, settle(md, DEFAULT_STIM.hold, 50, DT), DT, 5);
+    const old = freeRun(md, { ...DEFAULT_STIM, sweep: 30 }, settle(md, DEFAULT_STIM.hold, 50, DT), DT, 5);
     const r = iclamp(md, DEFAULT_I, DT, 5)[0];
-    expect(longestSweep(DEFAULT_I)).toBe(40);
+    expect(longestSweep(DEFAULT_I)).toBe(30);
     for (const f of ["t", "v", "iNa", "iK", "m", "h", "n", "iStim"] as const) expect(Array.from(r[f])).toEqual(Array.from(old[f]));
   });
 });
@@ -142,7 +142,15 @@ describe("threshold on a protocol", () => {
     const { pulseThreshold } = await import("./sim.ts");
     const { thresholdP } = await import("./protocol.ts");
     const from = settle(md, 0, 50, DT);
-    expect(thresholdP(md, DEFAULT_I, from, DT)).toBe(pulseThreshold(md, { ...DEFAULT_STIM, sweep: 40 }, from, DT));
+    expect(thresholdP(md, DEFAULT_I, from, DT)).toBe(pulseThreshold(md, { ...DEFAULT_STIM, sweep: 30 }, from, DT));
+  });
+  it("the opening walks nine pulses in 30 ms: silent up to 1% under threshold, firing from 1% over", async () => {
+    const { thresholdLadder } = await import("./sim.ts");
+    const { thresholdP, firesP } = await import("./protocol.ts");
+    const from = settle(md, 0, 50, DT), thr = thresholdP(md, DEFAULT_I, from, DT)!;
+    const rungs = thresholdLadder(thr, 20);
+    expect(rungs.length).toBe(9);
+    expect(rungs.map((r) => firesP(md, withPulse(DEFAULT_I, r.amp), from, DT))).toEqual([false, false, false, false, false, false, false, true, true]);
   });
   it("a hyperpolarizing pulse has a negative threshold: anode break", async () => {
     const { thresholdP, firesP } = await import("./protocol.ts");

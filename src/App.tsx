@@ -102,6 +102,10 @@ function curves(md: Model, id: GateId) {
 const STOCK_CURVES = { m: curves(STOCK_MODEL, "m"), h: curves(STOCK_MODEL, "h"), n: curves(STOCK_MODEL, "n") };
 
 const SETTLE_MS = 50, DT = 0.01;
+/** the opening: the time between one pulse and the next */
+const OPENING_MS = 500;
+/** the window height at which the wide layout, stepping, fits without giving up plot height */
+const WIDE_STEP_H = 960;
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 /** the clamp header's experiments: two pairs of Protocol's stock protocols, by id, in header order */
 const EXPERIMENTS = Object.fromEntries((["steps", "hinf", "onset", "recovery"] as const).map((id) => [id, V_PRESETS.find((x) => x.id === id)!])) as Record<ExperimentId, Preset>;
@@ -143,7 +147,7 @@ function Main({ onRetro }: { onRetro: () => void }) {
   // the gates drawn on the curve plots: any combination, toggled on and off
   const [shown, setShown] = useState<GateId[]>(["m"]);
   const [logY, setLogY] = useState(false);
-  const [tab, setTab] = useState<SimTab>("clamp");
+  const [tab, setTab] = useState<SimTab>("spike");
   // the currents drawn in voltage clamp, either or both, on the traces and on the I–V; and whether the I–V replaces the traces
   const [clampCur, setClampCur] = useState<Cur[]>(["iNa"]);
   // the clamp shows currents or, with g on, the conductances behind them
@@ -180,7 +184,8 @@ function Main({ onRetro }: { onRetro: () => void }) {
   };
   const [clampX, setClampX] = useState<Range | null>(null);
   // stepping through: one sweep at a time, forward and back, for teaching from the front of a room
-  const [stepping, setStepping] = useState(false);
+  // the page opens on it: the pulses up to threshold and across it, playing by themselves
+  const [stepping, setStepping] = useState(true);
   const [clampK, setClampK] = useState(0);
   const [spikeK, setSpikeK] = useState(0);
   const [spikeX, setSpikeX] = useState<Range | null>(null);
@@ -203,7 +208,7 @@ function Main({ onRetro }: { onRetro: () => void }) {
 
   // The pulses around threshold are built from the cell as it was when stepping began (or was re-centered), so moving
   // a slider changes the cell, not the stimulus: pick a pulse just under threshold, then see what a parameter does to it.
-  const [ladderP, setLadderP] = useState<Params | null>(null);
+  const [ladderP, setLadderP] = useState<Params | null>(p);
   const pinned = ladderP ?? p;
   // a hyperpolarizing pulse (anode break) is scaled the same way, downward
   const sgn = pulseAmp(ip) < 0 ? -1 : 1;
@@ -229,6 +234,22 @@ function Main({ onRetro }: { onRetro: () => void }) {
   const nSteps = tab === "clamp" ? fam.length : ladder ? ladder.rungs.length : runs.length;
   const k = Math.min(tab === "clamp" ? clampK : spikeK, nSteps - 1);
   const go = (d: number) => (tab === "clamp" ? setClampK : setSpikeK)(Math.max(0, Math.min(nSteps - 1, k + d)));
+  // The opening: one pulse every half second, up to the last. The first touch, click or key hands the page over.
+  // With reduced motion it does not play, and waits on the first pulse.
+  const [playing, setPlaying] = useState(() => typeof matchMedia === "undefined" || !matchMedia("(prefers-reduced-motion: reduce)").matches);
+  useEffect(() => {
+    if (!playing) return;
+    const stop = () => setPlaying(false);
+    const events = ["pointerdown", "keydown", "wheel"] as const;
+    events.forEach((e) => addEventListener(e, stop, { capture: true, passive: true }));
+    return () => events.forEach((e) => removeEventListener(e, stop, { capture: true }));
+  }, [playing]);
+  useEffect(() => {
+    if (!playing) return;
+    if (spikeK >= nSteps - 1) { setPlaying(false); return; }
+    const id = setTimeout(() => setSpikeK(spikeK + 1), OPENING_MS);
+    return () => clearTimeout(id);
+  }, [playing, spikeK, nSteps]);
   const rung = ladder ? ladder.rungs[k] : null;
   const rungAmp = rung?.amp;
   const rungStock = useMemo(
@@ -283,8 +304,10 @@ function Main({ onRetro }: { onRetro: () => void }) {
   const stepH = stepping ? 60 : 0;
   // a banner (the dev site's one line, an earlier version's two) takes its height from the traces in Focus on a phone
   const bannerH = wide ? 0 : DEV_SITE ? 24 : ARCHIVED ? 52 : 0;
+  // on a wide screen the stepper's words stay in view: the plots give up the height it needs, down to a readable size
+  const tight = wide && stepping && !focus ? Math.min(200, Math.max(0, WIDE_STEP_H - winH)) : 0;
   const H = wide
-    ? focus ? { curve: 260, strip: 90, sim: Math.max(280, winH - 270 - stepH), v: Math.max(170, (winH - 260 - stepH) / 2), sim2: Math.max(180, (winH - 260 - stepH) / 2) } : { curve: 260, strip: 72, sim: 280, v: 170, sim2: 180 }
+    ? focus ? { curve: 260, strip: 90, sim: Math.max(280, winH - 270 - stepH), v: Math.max(170, (winH - 260 - stepH) / 2), sim2: Math.max(180, (winH - 260 - stepH) / 2) } : { curve: 260 - tight * 0.4, strip: 72, sim: 280 - tight * 0.6, v: 170 - tight * 0.3, sim2: 180 - tight * 0.3 }
     : focus ? { curve: 132, strip: 60, sim: 320 - bannerH, v: 150 - bannerH / 2, sim2: 190 - bannerH / 2 } : { curve: 132, strip: 46, sim: 124, v: 64, sim2: 80 };
 
   // ------------------------------------------------------------ curves
