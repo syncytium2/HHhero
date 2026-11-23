@@ -37,12 +37,16 @@ await noSideways(phone, "phone");
 // the opening: Spike, a 30 ms window, the nine pulses arriving about half a second apart
 const openText = async (pg) => (await pg.locator(".step-text").count()) ? (await pg.locator(".step-text").textContent()) ?? "" : "";
 const opened = Date.now();
+const currentTicks = (pg) => pg.evaluate(() => [...document.querySelectorAll('svg[aria-label="currents during the action potential"] .tick')].filter((e) => e.getAttribute("text-anchor") === "end").map((e) => e.textContent).join(" "));
+const ticksAtOpen = await currentTicks(phone);
+if (await phone.locator(".curves").count()) problems.push("phone: the page did not open in Focus");
 if (!/^Pulse [12] of 9/.test(await openText(phone))) problems.push(`phone: the page did not open on the pulses ("${await openText(phone)}")`);
 const openTick = await phone.evaluate(() => { const t = [...document.querySelectorAll('svg[aria-label="currents during the action potential"] .tick')].filter((e) => e.getAttribute("text-anchor") === "middle"); return parseFloat(t[t.length - 1]?.textContent ?? "NaN"); });
 if (openTick !== 30) problems.push(`phone: the opening window ends at ${openTick} ms, not 30`);
 await phone.waitForFunction(() => document.querySelector(".step-text")?.textContent?.startsWith("Pulse 9 of 9"), null, { timeout: 9000 }).catch(() => problems.push("phone: the opening never reached pulse 9"));
 const playedMs = Date.now() - opened;
 if (playedMs < 3000 || playedMs > 6000) problems.push(`phone: the opening took ${playedMs} ms, not about 4000`);
+if ((await currentTicks(phone)) !== ticksAtOpen) problems.push(`phone: the current axis moved between pulses (${ticksAtOpen} -> ${await currentTicks(phone)})`);
 await phone.screenshot({ path: `${out}/phone-open.png` });
 {
   // the first touch hands the page over; reduced motion does not play
@@ -57,6 +61,17 @@ await phone.screenshot({ path: `${out}/phone-open.png` });
   await still.waitForTimeout(1300);
   if (!(await openText(still)).startsWith("Pulse 1 of 9")) problems.push(`phone: with reduced motion the opening played ("${await openText(still)}")`);
   await still.context().close();
+  // the tour lifts Focus to show the curve controls, puts it back, and saves nothing
+  const toured = await open({ viewport: { width: 360, height: 740 }, isMobile: true, hasTouch: true });
+  await toured.getByRole("button", { name: "quick tour" }).tap();
+  await toured.locator(".tour-card").waitFor();
+  await toured.waitForTimeout(150);
+  if (!(await toured.locator(".curves").count())) problems.push("phone: the tour did not bring the curves back to show them");
+  await toured.keyboard.press("Escape");
+  await toured.waitForTimeout(900);
+  if (await toured.locator(".curves").count()) problems.push("phone: after the tour, Focus did not come back");
+  if ((await toured.evaluate(() => localStorage.getItem("hhhero.focus.v2"))) !== null) problems.push("phone: the tour saved a Focus choice");
+  await toured.context().close();
 }
 
 // a banner (an earlier version, or the dev site) is never squeezed: on a short screen the page's column once cut its text in half
@@ -93,10 +108,11 @@ const small = await phone.evaluate(() =>
 );
 for (const s of small) problems.push(`phone: touch target too small: "${s.t}" ${s.w}×${s.h} (min ${s.min})`);
 
-// the rest of this walk starts from the clamp with Step off
+// the rest of this walk starts from the clamp with Step and Focus off
 const toClamp = async (pg) => {
   await pg.getByRole("button", { name: "Voltage clamp" }).click();
   await pg.getByRole("button", { name: "step through" }).click();
+  await pg.getByRole("button", { name: "focus on the traces" }).click();
   await pg.waitForTimeout(120);
 };
 await toClamp(phone);

@@ -581,3 +581,11 @@ the playing, so it never moves a trace under someone's finger; with reduced
 motion it does not play. The stock Pulse is 30 ms instead of 40: its threshold
 and every spike time on the ladder are the same at both lengths. The other
 current-clamp protocols keep their own lengths.
+
+The owner, on the dev site: "current/density y-axis should be fixed. also
+default into focus mode". The current axis now spans the stock spike and every
+pulse the protocol can show, so it holds still while the pulses step; it grows
+only if an edited cell's current would leave it. Focus is on unless a device
+turned it off, under a new storage key so a choice saved when Focus started off
+does not carry over. The tour lifts Focus while it runs, because the curve
+controls it must show are hidden in Focus, and restores it afterward.

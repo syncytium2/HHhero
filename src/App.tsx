@@ -104,6 +104,7 @@ const STOCK_CURVES = { m: curves(STOCK_MODEL, "m"), h: curves(STOCK_MODEL, "h"),
 const SETTLE_MS = 50, DT = 0.01;
 /** the opening: the time between one pulse and the next */
 const OPENING_MS = 500;
+const FOCUS_KEY = "hhhero.focus.v2";
 /** the window height at which the wide layout, stepping, fits without giving up plot height */
 const WIDE_STEP_H = 960;
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
@@ -123,6 +124,9 @@ function sweepWords(pr: Protocol, k: number): string {
  * links to it until this is true.
  */
 export const SHOW_1952 = false;
+
+/** the stock action potential: the current axis always has room for it */
+const STOCK_SPIKE = iclamp(STOCK_MODEL, DEFAULT_I, DT, 5);
 
 /** The app, or the 1952 screen when the address ends in #1952 (so it can be linked to). */
 export function App() {
@@ -176,11 +180,17 @@ function Main({ onRetro }: { onRetro: () => void }) {
   const [about, setAbout] = useState(false);
   const [touring, setTouring] = useState(false);
   // focus: the curves card hides and the traces take its height, for teaching from the front of a room; remembered per device
-  const [focus, setFocus] = useState(() => { try { return localStorage.getItem("hhhero.focus") === "1"; } catch { return false; } });
+  // On unless this device turned it off. A new key: a choice saved when Focus started off does not carry over.
+  const [focus, setFocus] = useState(() => { try { return localStorage.getItem(FOCUS_KEY) !== "0"; } catch { return true; } });
+  // the tour needs the curves card on screen to show its controls: it lifts Focus, and puts it back at the end
+  const focusBeforeTour = useRef(focus);
+  const startTour = () => { focusBeforeTour.current = focus; setFocus(false); setTouring(true); };
+  const endTour = () => { setTouring(false); setFocus(focusBeforeTour.current); };
   const toggleFocus = () => {
     const on = !focus;
     setFocus(on);
-    try { localStorage.setItem("hhhero.focus", on ? "1" : "0"); } catch { /* private window: not remembered */ }
+    if (touring) return; // the tour's own press is not the reader's choice
+    try { localStorage.setItem(FOCUS_KEY, on ? "1" : "0"); } catch { /* private window: not remembered */ }
   };
   const [clampX, setClampX] = useState<Range | null>(null);
   // stepping through: one sweep at a time, forward and back, for teaching from the front of a room
@@ -251,6 +261,15 @@ function Main({ onRetro }: { onRetro: () => void }) {
     return () => clearTimeout(id);
   }, [playing, spikeK, nSteps]);
   const rung = ladder ? ladder.rungs[k] : null;
+  // The current axis holds still from pulse to pulse: it spans the stock spike and every sweep this protocol can show.
+  const currentY = useMemo((): Range => {
+    const sweeps = [...STOCK_SPIKE, ...runs, ...runsStock];
+    if (ladder) for (const r of ladder.rungs) sweeps.push(r.run, iclampSweep(STOCK_MODEL, withPulse(ip, r.amp), 0, DT, 5));
+    let lo = 0, hi = 0;
+    for (const s of sweeps) for (const a of [s.iNa, s.iK]) for (let i = 0; i < a.length; i++) { if (a[i] < lo) lo = a[i]; if (a[i] > hi) hi = a[i]; }
+    const pad = 0.06 * (hi - lo);
+    return [(lo - pad) / 1000, (hi + pad) / 1000];
+  }, [runs, runsStock, ladder, ip]);
   const rungAmp = rung?.amp;
   const rungStock = useMemo(
     () => (rungAmp === undefined ? null : iclampSweep(STOCK_MODEL, withPulse(ip, rungAmp), 0, DT, 5)),
@@ -308,7 +327,7 @@ function Main({ onRetro }: { onRetro: () => void }) {
   const tight = wide && stepping && !focus ? Math.min(200, Math.max(0, WIDE_STEP_H - winH)) : 0;
   const H = wide
     ? focus ? { curve: 260, strip: 90, sim: Math.max(280, winH - 270 - stepH), v: Math.max(170, (winH - 260 - stepH) / 2), sim2: Math.max(180, (winH - 260 - stepH) / 2) } : { curve: 260 - tight * 0.4, strip: 72, sim: 280 - tight * 0.6, v: 170 - tight * 0.3, sim2: 180 - tight * 0.3 }
-    : focus ? { curve: 132, strip: 60, sim: 320 - bannerH, v: 150 - bannerH / 2, sim2: 190 - bannerH / 2 } : { curve: 132, strip: 46, sim: 124, v: 64, sim2: 80 };
+    : focus ? { curve: 132, strip: 60, sim: 320 - bannerH - stepH, v: 150 - (bannerH + stepH) / 2, sim2: 190 - (bannerH + stepH) / 2 } : { curve: 132, strip: 46, sim: 124, v: 64, sim2: 80 };
 
   // ------------------------------------------------------------ curves
   const one = shown.length === 1;
@@ -641,7 +660,7 @@ function Main({ onRetro }: { onRetro: () => void }) {
           zoom={spikeZoom}
           {...spikeCursor}
           zeroLine
-          y={spikeTrace === "gates" ? [-0.04, 1.04] : undefined}
+          y={spikeTrace === "gates" ? [-0.04, 1.04] : spikeTrace === "i" ? currentY : undefined}
           yInclude={[0]}
           xLabel="ms"
           yLabel={spikeTrace === "i" ? "mA/cm²" : spikeTrace === "g" ? "mS/cm²" : "gates"}
@@ -833,7 +852,7 @@ function Main({ onRetro }: { onRetro: () => void }) {
         </div>
         <button className="why-btn" onClick={() => setAbout(true)}
           {...tour("Why", "What an action potential is, where this site fits, the model and its source, and the earlier versions.")}>Why</button>
-        <button className="tour-btn" aria-label="quick tour" onClick={() => setTouring(true)} disabled={touring}>Tour</button>
+        <button className="tour-btn" aria-label="quick tour" onClick={startTour} disabled={touring}>Tour</button>
         {wide && SHOW_1952 && (
           <button className="r-enter" onClick={onRetro}
             {...tour("1952", "Re-run figures from Hodgkin and Huxley's model paper, on a green-phosphor screen, in the paper's own signs.")}>1952</button>
@@ -990,7 +1009,7 @@ function Main({ onRetro }: { onRetro: () => void }) {
         </div>
       </aside>
 
-      {touring && <Tour onEnd={() => setTouring(false)} />}
+      {touring && <Tour onEnd={endTour} />}
       {about && (
         <div className="about" role="dialog" aria-modal="true" aria-label="why HHhero" onClick={() => setAbout(false)}>
           <div className="about-card" onClick={(e) => e.stopPropagation()}>
