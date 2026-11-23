@@ -39,6 +39,8 @@ const openText = async (pg) => (await pg.locator(".step-text").count()) ? (await
 const opened = Date.now();
 const currentTicks = (pg) => pg.evaluate(() => [...document.querySelectorAll('svg[aria-label="currents during the action potential"] .tick')].filter((e) => e.getAttribute("text-anchor") === "end").map((e) => e.textContent).join(" "));
 const ticksAtOpen = await currentTicks(phone);
+const currentPaths = (pg) => pg.locator('svg[aria-label="currents during the action potential"] path[d^="M"]').count();
+const pathsAtOpen = await currentPaths(phone);
 if (await phone.locator(".curves").count()) problems.push("phone: the page did not open in Focus");
 if (!/^Pulse [12] of 9/.test(await openText(phone))) problems.push(`phone: the page did not open on the pulses ("${await openText(phone)}")`);
 const openTick = await phone.evaluate(() => { const t = [...document.querySelectorAll('svg[aria-label="currents during the action potential"] .tick')].filter((e) => e.getAttribute("text-anchor") === "middle"); return parseFloat(t[t.length - 1]?.textContent ?? "NaN"); });
@@ -47,6 +49,8 @@ await phone.waitForFunction(() => document.querySelector(".step-text")?.textCont
 const playedMs = Date.now() - opened;
 if (playedMs < 3000 || playedMs > 6000) problems.push(`phone: the opening took ${playedMs} ms, not about 4000`);
 if ((await currentTicks(phone)) !== ticksAtOpen) problems.push(`phone: the current axis moved between pulses (${ticksAtOpen} -> ${await currentTicks(phone)})`);
+// by the ninth pulse the eight before it are ghosts on the current plot, INa and IK each (the first look may already be on pulse 2)
+if ((await currentPaths(phone)) - pathsAtOpen < 14) problems.push(`phone: the earlier pulses' currents are not ghosted (${pathsAtOpen} -> ${await currentPaths(phone)} traces)`);
 await phone.screenshot({ path: `${out}/phone-open.png` });
 {
   // the first touch hands the page over; reduced motion does not play

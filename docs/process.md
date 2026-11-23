@@ -589,3 +589,7 @@ only if an edited cell's current would leave it. Focus is on unless a device
 turned it off, under a new storage key so a choice saved when Focus started off
 does not carry over. The tour lifts Focus while it runs, because the curve
 controls it must show are hidden in Focus, and restores it afterward.
+
+The owner: "maybe ghost the currents too like Vm". The I view now keeps the
+earlier sweeps' INa and IK, faded in their own colors, behind the current one,
+as the V plot does.

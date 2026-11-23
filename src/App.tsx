@@ -619,11 +619,18 @@ function Main({ onRetro }: { onRetro: () => void }) {
     }
   } else {
     const ap = apShown, apStock = apStockShown;
+    // the sweeps already stepped past, faded behind this one, as on the V plot
+    const earlier = ladder ? ladder.rungs.slice(0, k).map((r) => r.run) : family ? runs.slice(0, ri) : [];
+    const ghostI = earlier.flatMap((r): Series[] => [
+      { x: r.t, y: mA(r.iNa), color: C.na, width: 1.2, opacity: 0.25 },
+      { x: r.t, y: mA(r.iK), color: C.k, width: 1.2, dash: "5 4", opacity: 0.25 },
+    ]);
     const second: Series[] =
       spikeTrace === "i"
         ? [
             { x: apStock.t, y: mA(apStock.iNa), color: C.stock, width: 2.5 },
             { x: apStock.t, y: mA(apStock.iK), color: C.stock, width: 2.5, dash: "5 4" },
+            ...ghostI,
             { x: ap.t, y: mA(ap.iNa), color: C.na, label: "INa", labelAt: "peak" },
             { x: ap.t, y: mA(ap.iK), color: C.k, dash: "5 4", label: "IK", labelAt: "peak" },
           ]
