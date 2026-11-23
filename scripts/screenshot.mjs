@@ -52,6 +52,29 @@ if ((await currentTicks(phone)) !== ticksAtOpen) problems.push(`phone: the curre
 // by the ninth pulse the eight before it are ghosts on the current plot, INa and IK each (the first look may already be on pulse 2)
 if ((await currentPaths(phone)) - pathsAtOpen < 14) problems.push(`phone: the earlier pulses' currents are not ghosted (${pathsAtOpen} -> ${await currentPaths(phone)} traces)`);
 await phone.screenshot({ path: `${out}/phone-open.png` });
+// the inset is an add-on: off at the opening, and the main plots are the same with it open
+{
+  const inset = 'svg[aria-label^="near threshold"]';
+  const main = () => phone.evaluate(() => ["membrane potential", "currents during the action potential"].map((n) => document.querySelector(`svg[aria-label="${n}"]`).outerHTML).join(""));
+  if (await phone.locator(inset).count()) problems.push("phone: the inset is on at the opening");
+  const before = await main();
+  await phone.getByRole("button", { name: "near-threshold inset" }).tap();
+  await phone.waitForTimeout(150);
+  if ((await phone.locator(inset).count()) !== 1) problems.push("phone: the Inset button did not open the inset");
+  const paths = await phone.locator(`${inset} path`).count();
+  if (paths !== 18) problems.push(`phone: at pulse 9 the inset draws ${paths} traces, not 18`);
+  const vLabels = await phone.locator(`${inset} text.inset-tick[text-anchor="end"]`).count();
+  if (vLabels < 4) problems.push(`phone: the inset's Vm axis has ${vLabels - 1} tick labels, not 3`);
+  if ((await main()) !== before) problems.push("phone: opening the inset changed the main plots");
+  const box = await phone.locator(".threshold-inset").boundingBox();
+  if (box.x + box.width > 360) problems.push("phone: the inset runs off the screen");
+  await phone.screenshot({ path: `${out}/phone-inset.png` });
+  await noSideways(phone, "phone inset");
+  await phone.getByRole("button", { name: "near-threshold inset" }).tap();
+  await phone.waitForTimeout(100);
+  if (await phone.locator(inset).count()) problems.push("phone: the Inset button did not close the inset");
+  if ((await main()) !== before) problems.push("phone: closing the inset left the main plots changed");
+}
 {
   // the first touch hands the page over; reduced motion does not play
   const held = await open({ viewport: { width: 360, height: 740 }, isMobile: true, hasTouch: true });
@@ -432,7 +455,12 @@ await phone.getByRole("button", { name: "Close" }).tap();
 
 // ---------------------------------------------------------------- wide
 const wide = await open({ viewport: { width: 1440, height: 900 } });
+await wide.waitForFunction(() => document.querySelector(".step-text")?.textContent?.startsWith("Pulse 9 of 9"), null, { timeout: 9000 }).catch(() => problems.push("wide: the opening never reached pulse 9"));
 await wide.screenshot({ path: `${out}/wide-open.png` });
+await wide.getByRole("button", { name: "near-threshold inset" }).click();
+await wide.waitForTimeout(150);
+await wide.screenshot({ path: `${out}/wide-inset.png` });
+await wide.getByRole("button", { name: "near-threshold inset" }).click();
 for (const [w, h] of [[1440, 900], [1280, 800], [1366, 768]]) {
   await wide.setViewportSize({ width: w, height: h });
   await wide.waitForTimeout(150);

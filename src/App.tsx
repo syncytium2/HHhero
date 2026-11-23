@@ -12,6 +12,7 @@ import { Plot, type Series } from "./ui/Plot.tsx";
 import { Slider } from "./ui/Slider.tsx";
 import { Tour, tour } from "./ui/Tour.tsx";
 import { Retro } from "./ui/Retro.tsx";
+import { ThresholdInset } from "./ui/ThresholdInset.tsx";
 import { clampView, isFull, type Range } from "./ui/zoom.ts";
 import {
   fmt, GATE_IDS, infEdited, NO_EDIT, rateEdited, rateFormula, STOCK_RATES, stockGate, tauEdited,
@@ -21,7 +22,7 @@ import { buildModel, stockParams, type Model, type Params } from "./core/model.t
 import { availability, settle, spikeTimes, thresholdLadder, type ClampSweep } from "./core/sim.ts";
 import {
   commandLine, DEFAULT_I, DEFAULT_V, epochAtTime, inactShaped, onsetShaped, timeCourse, firesP, I_PRESETS, iclamp, iclampSweep, LETTERS, longestSweep, pulseAmp, swept,
-  sweepEpochs, thresholdP, V_PRESETS, vclamp, withPulse, type Preset, type Protocol,
+  sweepEpochs, thresholdP, insetScale, netIonic, pulseEpoch, pulseStart, V_PRESETS, vclamp, withPulse, type Preset, type Protocol,
 } from "./core/protocol.ts";
 import { ProtocolEditor, protocolWords } from "./ui/ProtocolEditor.tsx";
 import { hInfLabel, inactNote, noteFor, timeCourseNote, type View } from "./core/notes.ts";
@@ -270,6 +271,15 @@ function Main({ onRetro }: { onRetro: () => void }) {
     const pad = 0.06 * (hi - lo);
     return [(lo - pad) / 1000, (hi + pad) / 1000];
   }, [runs, runsStock, ladder, ip]);
+  // the near-threshold inset: an add-on over the main plots, off until asked for, while stepping through the spike
+  const [inset, setInset] = useState(false);
+  const insetData = useMemo(() => {
+    if (!stepping || tab !== "spike") return null;
+    const src = ladder ? ladder.rungs.map((r) => ({ s: r.run, fired: r.fired })) : runs.map((s) => ({ s, fired: spikeTimes(s.t, s.v).length > 0 }));
+    const sweeps = src.map(({ s, fired }) => ({ t: s.t, v: s.v, im: netIonic(s, p.gL, p.eL), fired }));
+    const j = pulseEpoch(ip), at = j < 0 ? 0 : pulseStart(ip, j);
+    return { sweeps, scale: insetScale(sweeps, [Math.max(0, at - 1), at + 11]) };
+  }, [stepping, tab, ladder, runs, p.gL, p.eL, ip]);
   const rungAmp = rung?.amp;
   const rungStock = useMemo(
     () => (rungAmp === undefined ? null : iclampSweep(STOCK_MODEL, withPulse(ip, rungAmp), 0, DT, 5)),
@@ -963,7 +973,7 @@ function Main({ onRetro }: { onRetro: () => void }) {
             </span>
           </div>
           {(tab === "spike" || !curve) && protocol}
-          <div className="sim-plots" {...tour("The traces", "Pinch or drag across them to zoom time; double-tap or double-click resets.")}>{simPlot}</div>
+          <div className="sim-plots" {...tour("The traces", "Pinch or drag across them to zoom time; double-tap or double-click resets.")}>{simPlot}{inset && insetData && <ThresholdInset sweeps={insetData.sweeps} k={k} scale={insetData.scale} />}</div>
           {stepping && (
             <div className="stepper" role="group" aria-label="steps" {...tour("Stepping", "Back and forward through the sweeps.")}>
               <button aria-label="previous step" disabled={k === 0} onClick={() => go(-1)}>‹</button>
@@ -988,6 +998,10 @@ function Main({ onRetro }: { onRetro: () => void }) {
             </span>
             {zoomOn && (
               <button className="zoom-reset" {...tour("Reset zoom", "Back to the whole sweep.")} onClick={() => (tab === "clamp" ? setClampX(null) : setSpikeX(null))}>Reset zoom</button>
+            )}
+            {insetData && (
+              <button className={`measure-btn${inset ? " on" : ""}`} aria-pressed={inset} aria-label="near-threshold inset" onClick={() => setInset(!inset)}
+                {...tour("Inset", "A close-up near threshold, over the main plots: Vm on the left axis and net ionic current, INa + IK + IL, on the right. Its scale fits the pulses that do not fire, so a spike runs off it.")}>Inset</button>
             )}
             {(tab === "spike" || !curve) && (
               <button className={`measure-btn${measure ? " on" : ""}`} aria-pressed={measure} aria-label="measuring cursor" onClick={toggleMeasure}

@@ -453,3 +453,37 @@ export function thresholdP(md: Model, p: Protocol, from: State, dt: number, maxA
   }
   return sgn * hi;
 }
+
+// ---------------------------------------------------------------- the near-threshold inset
+
+/** net ionic current, INa + IK + IL (µA/cm²): what is left when the channels' currents are added up */
+export function netIonic(s: { v: ArrayLike<number>; iNa: ArrayLike<number>; iK: ArrayLike<number> }, gL: number, eL: number): Float64Array {
+  const out = new Float64Array(s.v.length);
+  for (let i = 0; i < out.length; i++) out[i] = s.iNa[i] + s.iK[i] + gL * (s.v[i] - eL);
+  return out;
+}
+
+export interface InsetSweep { t: ArrayLike<number>; v: ArrayLike<number>; im: ArrayLike<number>; fired: boolean }
+export interface InsetScale { t: [number, number]; v: [number, number]; im: [number, number]; rest: number; im0: number }
+
+/**
+ * The inset's axes: each centered on its baseline, so rest and baseline current
+ * share a line, and wide enough for the largest sweep that does not fire. A
+ * spike runs off them. With no silent sweep, a span that suits the stock cell.
+ */
+export function insetScale(sweeps: InsetSweep[], t: [number, number]): InsetScale {
+  const rest = sweeps[0]?.v[0] ?? -65, im0 = sweeps[0]?.im[0] ?? 0;
+  let halfV = 0, halfI = 0;
+  for (const s of sweeps) {
+    if (s.fired) continue;
+    for (let i = 0; i < s.t.length; i++) {
+      if (s.t[i] < t[0] || s.t[i] > t[1]) continue;
+      halfV = Math.max(halfV, Math.abs(s.v[i] - rest));
+      halfI = Math.max(halfI, Math.abs(s.im[i] - im0));
+    }
+  }
+  if (!sweeps.some((s) => !s.fired)) { halfV = 8; halfI = 5; }
+  halfV = Math.max(0.5, halfV * 1.08);
+  halfI = Math.max(0.1, halfI * 1.08);
+  return { t, v: [rest - halfV, rest + halfV], im: [im0 - halfI, im0 + halfI], rest, im0 };
+}

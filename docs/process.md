@@ -593,3 +593,13 @@ controls it must show are hidden in Focus, and restores it afterward.
 The owner: "maybe ghost the currents too like Vm". The I view now keeps the
 earlier sweeps' INa and IK, faded in their own colors, behind the current one,
 as the V plot does.
+
+The owner, on the fixed current axis: "now it looks like there's no current
+until the spike", asking for a toggleable, autoscaling inset, and then: "do not
+change the main view. this is an addon", with Vm and Im on a double y axis. The
+Inset button, off by default, floats one plot over the late, flat part of the
+main traces. Vm is on the left, net ionic current (INa + IK + IL) on the right,
+rest lined up with the baseline current. Both axes fit the largest pulse that
+does not fire, and hold from pulse to pulse so the growth toward threshold
+shows; a spike runs off them. Im leaves out the capacitive current, because the
+total membrane current only mirrors the injected pulse.

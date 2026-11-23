@@ -163,6 +163,42 @@ describe("threshold on a protocol", () => {
   });
 });
 
+describe("the near-threshold inset", () => {
+  const P = stockParams();
+  const sweeps = async () => {
+    const { firesP, iclampSweep, netIonic, thresholdP } = await import("./protocol.ts");
+    const { thresholdLadder } = await import("./sim.ts");
+    const from = settle(md, 0, 50, DT), thr = thresholdP(md, DEFAULT_I, from, DT)!;
+    return thresholdLadder(thr, 20).map((r) => {
+      const q = withPulse(DEFAULT_I, r.amp), s = iclampSweep(md, q, 0, DT, 5, from);
+      return { t: s.t, v: s.v, im: netIonic(s, P.gL, P.eL), fired: firesP(md, q, from, DT) };
+    });
+  };
+  it("net ionic current is zero at rest", async () => {
+    for (const s of await sweeps()) expect(Math.abs(s.im[0])).toBeLessThan(1e-3);
+  });
+  it("centers both axes on the baseline and fits the silent pulses, which a spike does not widen", async () => {
+    const { insetScale } = await import("./protocol.ts");
+    const all = await sweeps(), a = insetScale(all, [4, 16]), b = insetScale(all.filter((s) => !s.fired), [4, 16]);
+    expect(a).toEqual(b);
+    expect((a.v[0] + a.v[1]) / 2).toBeCloseTo(a.rest, 9);
+    expect((a.im[0] + a.im[1]) / 2).toBeCloseTo(a.im0, 9);
+    for (const s of all.filter((x) => !x.fired)) for (let i = 0; i < s.t.length; i++) {
+      if (s.t[i] < 4 || s.t[i] > 16) continue;
+      expect(s.v[i]).toBeGreaterThanOrEqual(a.v[0]); expect(s.v[i]).toBeLessThanOrEqual(a.v[1]);
+      expect(s.im[i]).toBeGreaterThanOrEqual(a.im[0]); expect(s.im[i]).toBeLessThanOrEqual(a.im[1]);
+    }
+    const spike = all.find((s) => s.fired)!;
+    expect(Math.max(...spike.v)).toBeGreaterThan(a.v[1]);
+  });
+  it("with no silent sweep it still has axes", async () => {
+    const { insetScale } = await import("./protocol.ts");
+    const a = insetScale((await sweeps()).filter((s) => s.fired), [4, 16]);
+    expect(a.v[1]).toBeGreaterThan(a.v[0]);
+    expect(a.im[1]).toBeGreaterThan(a.im[0]);
+  });
+});
+
 describe("the time course of inactivation (Inact, traces)", () => {
   it("Onset: the test's peaks fall from sweep to sweep, and every one sits on the exponential with τh at −57 mV", async () => {
     const { onsetShaped, timeCourse } = await import("./protocol.ts");

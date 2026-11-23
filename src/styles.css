@@ -2,21 +2,21 @@
 :root {
   --bg: #fbfaf7; --card: #ffffff; --ink: #1d1f22; --muted: #6b6f76; --line: #dcdad4; --grid: #eeece7;
   --stock: #c9c6bf; --accent: #1d1f22; --on: #1d1f22; --on-ink: #ffffff; --note: #f3efe2;
-  --na: #c0392b; --k: #1f6fb2; --m: #d35400; --h: #7d3c98; --n: #138d75;
+  --na: #c0392b; --k: #1f6fb2; --m: #d35400; --h: #7d3c98; --n: #138d75; --im: #8a6a00;
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --bg: #151618; --card: #1d1f22; --ink: #ecebe7; --muted: #9a9ea6; --line: #34373c; --grid: #2a2c30;
     --stock: #55585e; --accent: #ecebe7; --on: #ecebe7; --on-ink: #151618; --note: #2b2a22;
-    --na: #f06b5d; --k: #5aa9e6; --m: #f39c4a; --h: #c08ad8; --n: #3fc9a6;
+    --na: #f06b5d; --k: #5aa9e6; --m: #f39c4a; --h: #c08ad8; --n: #3fc9a6; --im: #e3c24f;
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
   --bg: #151618; --card: #1d1f22; --ink: #ecebe7; --muted: #9a9ea6; --line: #34373c; --grid: #2a2c30;
   --stock: #55585e; --accent: #ecebe7; --on: #ecebe7; --on-ink: #151618; --note: #2b2a22;
-  --na: #f06b5d; --k: #5aa9e6; --m: #f39c4a; --h: #c08ad8; --n: #3fc9a6;
+  --na: #f06b5d; --k: #5aa9e6; --m: #f39c4a; --h: #c08ad8; --n: #3fc9a6; --im: #e3c24f;
   color-scheme: dark;
 }
 
@@ -239,3 +239,12 @@ body:has(.retro) { background: #1a1b19; }
 .t4 th { color: #e3c98f; font-weight: 600; }
 .r-enter { min-height: 44px; font-weight: 700; letter-spacing: 0.08em; background: #1a1b19; color: #6dff8a; border-color: #3a3b35; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+/* the near-threshold inset: floats over the flat part of the main plots and lets touches through */
+.sim-plots { position: relative; }
+.threshold-inset { position: absolute; top: 2px; right: 6px; width: 49%; max-width: 300px; background: var(--card); border: 1px solid var(--line); border-radius: 6px; pointer-events: none; }
+.threshold-inset svg { display: block; width: 100%; height: auto; }
+.inset-label { font-size: 8.5px; font-weight: 700; }
+.inset-tick { font-size: 8px; fill: var(--muted); }
+.inset-frame { fill: none; stroke: var(--line); }
+.inset-zero { stroke: var(--line); stroke-dasharray: 2 2; }
